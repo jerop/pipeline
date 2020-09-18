@@ -101,13 +101,13 @@ func (state PipelineRunState) GetNextTasks(candidateTasks sets.String) []*Resolv
 	return tasks
 }
 
-// SuccessfulOrSkippedDAGTasks returns a list of the names of all of the PipelineTasks in state
-// which have successfully completed or skipped
-func (state PipelineRunState) SuccessfulOrSkippedDAGTasks(d *dag.Graph) []string {
+// SuccessfulDAGTasks returns a list of the names of all of the PipelineTasks in state
+// which have successfully completed
+func (state PipelineRunState) SuccessfulDAGTasks(d *dag.Graph) []string {
 	tasks := []string{}
 	for _, t := range state {
 		if isTaskInGraph(t.PipelineTask.Name, d) {
-			if t.IsSuccessful() || t.Skip(state, d) {
+			if t.IsSuccessful() {
 				tasks = append(tasks, t.PipelineTask.Name)
 			}
 		}
@@ -117,14 +117,14 @@ func (state PipelineRunState) SuccessfulOrSkippedDAGTasks(d *dag.Graph) []string
 
 // checkTasksDone returns true if all tasks from the specified graph are finished executing
 // a task is considered done if it has failed/succeeded/skipped
-func (state PipelineRunState) checkTasksDone(d *dag.Graph) bool {
+func (state PipelineRunState) checkTasksDone(d *dag.Graph, skippedTasks []v1beta1.SkippedTask) bool {
 	for _, t := range state {
 		if isTaskInGraph(t.PipelineTask.Name, d) {
 			if t.TaskRun == nil {
 				// this task might have skipped if taskRun is nil
 				// continue and ignore if this task was skipped
 				// skipped task is considered part of done
-				if t.Skip(state, d) {
+				if t.isSkipped(skippedTasks) {
 					continue
 				}
 				return false
@@ -140,12 +140,12 @@ func (state PipelineRunState) checkTasksDone(d *dag.Graph) bool {
 // GetFinalTasks returns a list of final tasks without any taskRun associated with it
 // GetFinalTasks returns final tasks only when all DAG tasks have finished executing successfully or skipped or
 // any one DAG task resulted in failure
-func (state PipelineRunState) GetFinalTasks(d *dag.Graph, dfinally *dag.Graph) []*ResolvedPipelineRunTask {
+func (state PipelineRunState) GetFinalTasks(d *dag.Graph, dfinally *dag.Graph, skippedTasks []v1beta1.SkippedTask) []*ResolvedPipelineRunTask {
 	tasks := []*ResolvedPipelineRunTask{}
 	finalCandidates := sets.NewString()
 	// check either pipeline has finished executing all DAG pipelineTasks
 	// or any one of the DAG pipelineTask has failed
-	if state.checkTasksDone(d) {
+	if state.checkTasksDone(d, skippedTasks) {
 		// return list of tasks with all final tasks
 		for _, t := range state {
 			if isTaskInGraph(t.PipelineTask.Name, dfinally) && !t.IsSuccessful() {
@@ -198,7 +198,7 @@ func (state PipelineRunState) GetPipelineConditionStatus(pr *v1beta1.PipelineRun
 		switch {
 		case rprt.IsSuccessful():
 			withStatusTasks = append(withStatusTasks, rprt.PipelineTask.Name)
-		case rprt.Skip(state, dag):
+		case rprt.Skip() || rprt.isParentSkipped(state, dag, pr.Status.SkippedTasks):
 			withStatusTasks = append(withStatusTasks, rprt.PipelineTask.Name)
 			skipTasks = append(skipTasks, v1beta1.SkippedTask{Name: rprt.PipelineTask.Name})
 			// At least one is skipped and no failure yet, mark as completed
@@ -237,7 +237,7 @@ func (state PipelineRunState) GetPipelineConditionStatus(pr *v1beta1.PipelineRun
 	// transition pipeline into stopping state when one of the tasks(dag/final) cancelled or one of the dag tasks failed
 	// for a pipeline with final tasks, single dag task failure does not transition to interim stopping state
 	// pipeline stays in running state until all final tasks are done before transitioning to failed state
-	if cancelledTasks > 0 || (failedTasks > 0 && state.checkTasksDone(dfinally)) {
+	if cancelledTasks > 0 || (failedTasks > 0 && state.checkTasksDone(dfinally, pr.Status.SkippedTasks)) {
 		reason = v1beta1.PipelineRunReasonStopping.String()
 	} else {
 		reason = v1beta1.PipelineRunReasonRunning.String()
@@ -254,7 +254,7 @@ func (state PipelineRunState) GetPipelineConditionStatus(pr *v1beta1.PipelineRun
 func (state PipelineRunState) GetSkippedTasks(pr *v1beta1.PipelineRun, d *dag.Graph) []v1beta1.SkippedTask {
 	skipped := []v1beta1.SkippedTask{}
 	for _, rprt := range state {
-		if rprt.Skip(state, d) {
+		if rprt.Skip() || rprt.isParentSkipped(state, d, pr.Status.SkippedTasks) {
 			skipped = append(skipped, v1beta1.SkippedTask{Name: rprt.PipelineTask.Name})
 		}
 	}

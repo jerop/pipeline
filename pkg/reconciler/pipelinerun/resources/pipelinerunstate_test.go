@@ -467,7 +467,7 @@ func TestPipelineRunState_SuccessfulOrSkippedDAGTasks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error while buildig DAG for state %v: %v", tc.state, err)
 			}
-			names := tc.state.SuccessfulOrSkippedDAGTasks(dag)
+			names := tc.state.SuccessfulDAGTasks(dag)
 			if d := cmp.Diff(names, tc.expectedNames); d != "" {
 				t.Errorf("Expected to get completed names %v but got something different %s", tc.expectedNames, diff.PrintWantGot(d))
 			}
@@ -481,6 +481,7 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		desc               string
 		state              PipelineRunState
 		DAGTasks           []v1beta1.PipelineTask
+		skippedTasks       []v1beta1.SkippedTask
 		finalTasks         []v1beta1.PipelineTask
 		expectedFinalTasks []*ResolvedPipelineRunTask
 	}{{
@@ -554,6 +555,7 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		desc:               "DAG task (mytask6) condition failed - schedule final tasks (mytask2) ",
 		state:              append(conditionCheckFailedWithNoOtherTasksState, noneStartedState[0]),
 		DAGTasks:           []v1beta1.PipelineTask{pts[5]},
+		skippedTasks:       []v1beta1.SkippedTask{{Name: pts[5].Name}},
 		finalTasks:         []v1beta1.PipelineTask{pts[0]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[0]},
 	}, {
@@ -563,6 +565,7 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		desc:               "DAG task (mytask1) finished, mytask6 condition failed - schedule final tasks (mytask2)",
 		state:              append(conditionCheckFailedWithOthersPassedState, noneStartedState[1]),
 		DAGTasks:           []v1beta1.PipelineTask{pts[5], pts[0]},
+		skippedTasks:       []v1beta1.SkippedTask{{Name: pts[5].Name}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
@@ -572,24 +575,35 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		desc:               "DAG task (mytask1) failed, mytask6 condition failed - schedule final tasks (mytask2)",
 		state:              append(conditionCheckFailedWithOthersFailedState, noneStartedState[1]),
 		DAGTasks:           []v1beta1.PipelineTask{pts[5], pts[0]},
+		skippedTasks:       []v1beta1.SkippedTask{{Name: pts[5].Name}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
 		// tasks: [ mytask6 with condition, mytask7 runAfter mytask6]
 		// finally: [mytask2]
-		name:               "11 - DAG task skipped, return final tasks",
-		desc:               "DAG task (mytask6) condition failed, mytask6 and mytask7 skipped - schedule final tasks (mytask2)",
-		state:              append(taskWithParentSkippedState, noneStartedState[1]),
-		DAGTasks:           []v1beta1.PipelineTask{pts[5], pts[6]},
+		name:     "11 - DAG task skipped, return final tasks",
+		desc:     "DAG task (mytask6) condition failed, mytask6 and mytask7 skipped - schedule final tasks (mytask2)",
+		state:    append(taskWithParentSkippedState, noneStartedState[1]),
+		DAGTasks: []v1beta1.PipelineTask{pts[5], pts[6]},
+		skippedTasks: []v1beta1.SkippedTask{{
+			Name: pts[5].Name,
+		}, {
+			Name: pts[6].Name,
+		}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
 		// tasks: [ mytask1, mytask6 with condition, mytask8 runAfter mytask6]
 		// finally: [mytask2]
-		name:               "12 - DAG task succeeded/skipped, return final tasks",
-		desc:               "DAG task (mytask1) finished - DAG task (mytask6) condition failed, mytask6 and mytask8 skipped - schedule final tasks (mytask2)",
-		state:              append(taskWithMultipleParentsSkippedState, noneStartedState[1]),
-		DAGTasks:           []v1beta1.PipelineTask{pts[0], pts[5], pts[7]},
+		name:     "12 - DAG task succeeded/skipped, return final tasks",
+		desc:     "DAG task (mytask1) finished - DAG task (mytask6) condition failed, mytask6 and mytask8 skipped - schedule final tasks (mytask2)",
+		state:    append(taskWithMultipleParentsSkippedState, noneStartedState[1]),
+		DAGTasks: []v1beta1.PipelineTask{pts[0], pts[5], pts[7]},
+		skippedTasks: []v1beta1.SkippedTask{{
+			Name: pts[5].Name,
+		}, {
+			Name: pts[7].Name,
+		}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
@@ -598,8 +612,15 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		name: "13 - DAG task succeeded/skipped - return final tasks",
 		desc: "DAG task (mytask1) finished - DAG task (mytask6) condition failed, mytask6, mytask8, and mytask9 skipped" +
 			"- schedule final tasks (mytask2)",
-		state:              append(taskWithGrandParentSkippedState, noneStartedState[1]),
-		DAGTasks:           []v1beta1.PipelineTask{pts[0], pts[5], pts[7], pts[8]},
+		state:    append(taskWithGrandParentSkippedState, noneStartedState[1]),
+		DAGTasks: []v1beta1.PipelineTask{pts[0], pts[5], pts[7], pts[8]},
+		skippedTasks: []v1beta1.SkippedTask{{
+			Name: pts[5].Name,
+		}, {
+			Name: pts[7].Name,
+		}, {
+			Name: pts[8].Name,
+		}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
@@ -608,8 +629,13 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 		name: "14 - DAG task succeeded, skipped - return final tasks",
 		desc: "DAG task (mytask1) finished - DAG task (mytask6) failed - mytask8 and mytask9 skipped" +
 			"- schedule final tasks (mytask2)",
-		state:              append(taskWithGrandParentsOneFailedState, noneStartedState[1]),
-		DAGTasks:           []v1beta1.PipelineTask{pts[0], pts[5], pts[7], pts[8]},
+		state:    append(taskWithGrandParentsOneFailedState, noneStartedState[1]),
+		DAGTasks: []v1beta1.PipelineTask{pts[0], pts[5], pts[7], pts[8]},
+		skippedTasks: []v1beta1.SkippedTask{{
+			Name: pts[7].Name,
+		}, {
+			Name: pts[8].Name,
+		}},
 		finalTasks:         []v1beta1.PipelineTask{pts[1]},
 		expectedFinalTasks: []*ResolvedPipelineRunTask{noneStartedState[1]},
 	}, {
@@ -632,7 +658,7 @@ func TestPipelineRunState_GetFinalTasks(t *testing.T) {
 			t.Fatalf("Unexpected error while buildig DAG for final pipelineTasks %v: %v", tc.finalTasks, err)
 		}
 		t.Run(tc.name, func(t *testing.T) {
-			next := tc.state.GetFinalTasks(dagGraph, finalGraph)
+			next := tc.state.GetFinalTasks(dagGraph, finalGraph, tc.skippedTasks)
 			if d := cmp.Diff(tc.expectedFinalTasks, next); d != "" {
 				t.Errorf("Didn't get expected final Tasks for %s (%s): %s", tc.name, tc.desc, diff.PrintWantGot(d))
 			}

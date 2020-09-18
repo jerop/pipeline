@@ -501,8 +501,8 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 	// wait for all running tasks to complete and report their status
 	if !pipelineRunState.IsStopping(d) {
 		// candidateTasks is initialized to DAG root nodes to start pipeline execution
-		// candidateTasks is derived based on successfully finished tasks and/or skipped tasks
-		candidateTasks, err := dag.GetSchedulable(d, pipelineRunState.SuccessfulOrSkippedDAGTasks(d)...)
+		// candidateTasks is derived based on successfully finished tasks
+		candidateTasks, err := dag.GetSchedulable(d, pipelineRunState.SuccessfulDAGTasks(d)...)
 		if err != nil {
 			logger.Errorf("Error getting potential next tasks for valid pipelinerun %s: %v", pr.Name, err)
 			return controller.NewPermanentError(err)
@@ -521,10 +521,10 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 	resources.ApplyTaskResults(nextRprts, resolvedResultRefs)
 
 	// GetFinalTasks only returns tasks when a DAG is complete
-	nextRprts = append(nextRprts, pipelineRunState.GetFinalTasks(d, dfinally)...)
+	nextRprts = append(nextRprts, pipelineRunState.GetFinalTasks(d, dfinally, pr.Status.SkippedTasks)...)
 
 	for _, rprt := range nextRprts {
-		if rprt == nil || rprt.Skip(pipelineRunState, d) {
+		if rprt.Skip() {
 			continue
 		}
 		if rprt.ResolvedConditionChecks == nil || rprt.ResolvedConditionChecks.IsSuccess() {

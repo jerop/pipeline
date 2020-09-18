@@ -550,10 +550,11 @@ func DagFromState(state PipelineRunState) (*dag.Graph, error) {
 func TestIsSkipped(t *testing.T) {
 
 	tcs := []struct {
-		name     string
-		taskName string
-		state    PipelineRunState
-		expected bool
+		name         string
+		taskName     string
+		state        PipelineRunState
+		skippedTasks []v1beta1.SkippedTask
+		expected     bool
 	}{{
 		name:     "tasks-condition-passed",
 		taskName: "mytask1",
@@ -634,6 +635,9 @@ func TestIsSkipped(t *testing.T) {
 			ResolvedConditionChecks: failedTaskConditionCheckState,
 		}, {
 			PipelineTask: &pts[6],
+		}},
+		skippedTasks: []v1beta1.SkippedTask{{
+			Name: pts[5].Name,
 		}},
 		expected: true,
 	}, {
@@ -844,8 +848,8 @@ func TestIsSkipped(t *testing.T) {
 			if rprt == nil {
 				t.Fatalf("Could not get task %s from the state: %v", tc.taskName, tc.state)
 			}
-			isSkipped := rprt.Skip(tc.state, dag)
-			if d := cmp.Diff(isSkipped, tc.expected); d != "" {
+			isSkipped := rprt.Skip() || rprt.isParentSkipped(tc.state, dag, tc.skippedTasks) || tc.state.IsStopping(dag)
+			if d := cmp.Diff(tc.expected, isSkipped); d != "" {
 				t.Errorf("Didn't get expected isSkipped %s", diff.PrintWantGot(d))
 			}
 		})
