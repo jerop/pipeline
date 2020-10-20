@@ -94,9 +94,9 @@ func Build(tasks Tasks) (*Graph, error) {
 // It returns tasks which have all dependencies marked as done, and thus can be scheduled. If the
 // specified doneTasks are invalid (i.e. if it is indicated that a Task is
 // done, but the previous Tasks are not done), an error is returned.
-func GetSchedulable(g *Graph, doneTasks ...string) (sets.String, error) {
+func GetSchedulable(g *Graph, successfulTasks ...string) (sets.String, error) {
 	roots := getRoots(g)
-	tm := sets.NewString(doneTasks...)
+	tm := sets.NewString(successfulTasks...)
 	d := sets.NewString()
 
 	visited := sets.NewString()
@@ -112,7 +112,7 @@ func GetSchedulable(g *Graph, doneTasks ...string) (sets.String, error) {
 		visitedNames = append(visitedNames, v)
 	}
 
-	notVisited := list.DiffLeft(doneTasks, visitedNames)
+	notVisited := list.DiffLeft(successfulTasks, visitedNames)
 	if len(notVisited) > 0 {
 		return nil, fmt.Errorf("invalid list of done tasks; some tasks were indicated completed without ancestors being done: %v", notVisited)
 	}

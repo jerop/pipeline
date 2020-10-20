@@ -427,7 +427,7 @@ func TestPipelineRunState_SuccessfulOrSkippedDAGTasks(t *testing.T) {
 	}, {
 		name:          "one-task-failed",
 		state:         oneFailedState,
-		expectedNames: []string{pts[1].Name},
+		expectedNames: []string{},
 	}, {
 		name:          "all-finished",
 		state:         allFinishedState,
@@ -443,17 +443,17 @@ func TestPipelineRunState_SuccessfulOrSkippedDAGTasks(t *testing.T) {
 	}, {
 		name:          "conditional task skipped as the condition execution resulted in failure",
 		state:         conditionCheckFailedWithNoOtherTasksState,
-		expectedNames: []string{pts[5].Name},
+		expectedNames: []string{},
 	}, {
 		name: "conditional task skipped as the condition execution resulted in failure but the other pipeline task" +
 			"not skipped since it finished execution successfully",
 		state:         conditionCheckFailedWithOthersPassedState,
-		expectedNames: []string{pts[5].Name, pts[0].Name},
+		expectedNames: []string{pts[0].Name},
 	}, {
 		name: "conditional task skipped as the condition execution resulted in failure but the other pipeline task" +
 			"not skipped since it failed",
 		state:         conditionCheckFailedWithOthersFailedState,
-		expectedNames: []string{pts[5].Name},
+		expectedNames: []string{},
 	}}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
@@ -466,9 +466,9 @@ func TestPipelineRunState_SuccessfulOrSkippedDAGTasks(t *testing.T) {
 				TasksGraph:      d,
 				FinalTasksGraph: &dag.Graph{},
 			}
-			names := facts.successfulOrSkippedDAGTasks()
+			names := facts.getSuccessfulDAGTasks()
 			if d := cmp.Diff(names, tc.expectedNames); d != "" {
-				t.Errorf("Expected to get completed names %v but got something different %s", tc.expectedNames, diff.PrintWantGot(d))
+				t.Errorf("Expected to get successful tasks names %v but got something different %s", tc.expectedNames, diff.PrintWantGot(d))
 			}
 		})
 	}
