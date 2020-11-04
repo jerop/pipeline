@@ -179,6 +179,68 @@ func TestWorkspacePipelineRunDuplicateWorkspaceEntriesInvalid(t *testing.T) {
 	}
 }
 
+func TestWorkspacePipelineCyclicWorkspaceDependenciesInvalid(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	c, namespace := setup(ctx, t)
+
+	taskName := "read-workspace"
+	pipelineName := "read-workspace-pipeline"
+
+	knativetest.CleanupOnInterrupt(func() { tearDown(ctx, t, c, namespace) }, t.Logf)
+	defer tearDown(ctx, t, c, namespace)
+
+	task := &v1beta1.Task{
+		ObjectMeta: metav1.ObjectMeta{Name: taskName, Namespace: namespace},
+		Spec: v1beta1.TaskSpec{
+			Steps: []v1beta1.Step{{
+				Container: corev1.Container{Image: "alpine"},
+				Script:    "cat /workspace/test/file",
+			}},
+			Workspaces: []v1beta1.WorkspaceDeclaration{{
+				Name:        "test",
+				Description: "test workspace",
+				MountPath:   "/workspace/test/file",
+				ReadOnly:    true,
+			}},
+		},
+	}
+	if _, err := c.TaskClient.Create(ctx, task, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create Task: %s", err)
+	}
+
+	pipeline := &v1beta1.Pipeline{
+		ObjectMeta: metav1.ObjectMeta{Name: pipelineName, Namespace: namespace},
+		Spec: v1beta1.PipelineSpec{
+			Workspaces: []v1beta1.PipelineWorkspaceDeclaration{{
+				Name: "foo",
+			}},
+			Tasks: []v1beta1.PipelineTask{{
+				Name:    "task1",
+				TaskRef: &v1beta1.TaskRef{Name: taskName},
+				Workspaces: []v1beta1.WorkspacePipelineTaskBinding{{
+					Name:      "test",
+					Workspace: "foo",
+					From:      "task2",
+				}},
+			}, {
+				Name:    "task2",
+				TaskRef: &v1beta1.TaskRef{Name: taskName},
+				Workspaces: []v1beta1.WorkspacePipelineTaskBinding{{
+					Name:      "test",
+					Workspace: "foo",
+					From:      "task1",
+				}},
+			}},
+		},
+	}
+	_, err := c.PipelineClient.Create(ctx, pipeline, metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "couldn't create link from task1 to task2") {
+		t.Fatalf("Expected error when creating pipelinerun with cyclic workspace dependencies but received: %v", err)
+	}
+}
+
 func TestWorkspacePipelineRunMissingWorkspaceInvalid(t *testing.T) {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)

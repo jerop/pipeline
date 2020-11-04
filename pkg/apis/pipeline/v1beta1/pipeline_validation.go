@@ -141,9 +141,12 @@ func validatePipelineWorkspaces(wss []PipelineWorkspaceDeclaration, pts []Pipeli
 		wsTable.Insert(ws.Name)
 	}
 
+	wsMap := make(map[string]sets.String)
+
 	// Any workspaces used in PipelineTasks should have their name declared in the Pipeline's
 	// Workspaces list.
 	for i, pt := range pts {
+		wsMap[pt.Name] = sets.NewString()
 		for j, ws := range pt.Workspaces {
 			if !wsTable.Has(ws.Workspace) {
 				errs = errs.Also(apis.ErrInvalidValue(
@@ -151,8 +154,21 @@ func validatePipelineWorkspaces(wss []PipelineWorkspaceDeclaration, pts []Pipeli
 					"",
 				).ViaFieldIndex("workspaces", j).ViaFieldIndex("tasks", i))
 			}
+			wsMap[pt.Name].Insert(ws.Workspace)
 		}
 	}
+
+	for i, pt := range pts {
+		for j, ws := range pt.Workspaces {
+			if ws.From != "" && !wsMap[ws.From].Has(ws.Workspace) {
+				errs = errs.Also(apis.ErrInvalidValue(
+					fmt.Sprintf("pipeline task %q expects workspace with name %q to be operated on by pipeline task %q but it was not", pt.Name, ws.Workspace, ws.From),
+					"",
+				).ViaFieldIndex("workspaces", j).ViaFieldIndex("tasks", i))
+			}
+		}
+	}
+
 	for i, t := range finalTasks {
 		for j, ws := range t.Workspaces {
 			if !wsTable.Has(ws.Workspace) {

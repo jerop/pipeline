@@ -1415,6 +1415,27 @@ func TestValidatePipelineWorkspaces_Failure(t *testing.T) {
 			Message: `invalid value: workspace 0 has empty name`,
 			Paths:   []string{"workspaces[0]"},
 		},
+	}, {
+		name: "workspace dependency must operate on workspace",
+		workspaces: []PipelineWorkspaceDeclaration{{
+			Name: "ws",
+		}},
+		tasks: []PipelineTask{{
+			Name:    "parentTask",
+			TaskRef: &TaskRef{Name: "foo"},
+		}, {
+			Name:    "childTask",
+			TaskRef: &TaskRef{Name: "foo"},
+			Workspaces: []WorkspacePipelineTaskBinding{{
+				Name:      "test",
+				Workspace: "ws",
+				From:      "parentTask",
+			}},
+		}},
+		expectedError: apis.FieldError{
+			Message: `invalid value: pipeline task "childTask" expects workspace with name "ws" to be operated on by pipeline task "parentTask" but it was not`,
+			Paths:   []string{"tasks[1].workspaces[0]"},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

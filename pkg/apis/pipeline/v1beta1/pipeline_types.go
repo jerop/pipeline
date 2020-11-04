@@ -184,6 +184,14 @@ func (pt PipelineTask) resourceDeps() []string {
 			resourceDeps = append(resourceDeps, rd.From...)
 		}
 	}
+	// Add any dependents from workspaces
+	if pt.Workspaces != nil {
+		for _, w := range pt.Workspaces {
+			if w.From != "" {
+				resourceDeps = append(resourceDeps, w.From)
+			}
+		}
+	}
 	// Add any dependents from conditional resources.
 	for _, cond := range pt.Conditions {
 		for _, rd := range cond.Resources {

@@ -4092,6 +4092,13 @@ func schema_pkg_apis_pipeline_v1beta1_WorkspacePipelineTaskBinding(ref common.Re
 							Format:      "",
 						},
 					},
+					"from": {
+						SchemaProps: spec.SchemaProps{
+							Description: "From is the list of PipelineTask names that have to operate on this workspace before this task. Implies an ordering in the execution graph.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"name", "workspace"},
 			},

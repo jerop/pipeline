@@ -2335,6 +2335,10 @@
         "workspace"
       ],
       "properties": {
+        "from": {
+          "description": "From is the list of PipelineTask names that have to operate on this workspace before this task. Implies an ordering in the execution graph.",
+          "type": "string"
+        },
         "name": {
           "description": "Name is the name of the workspace as declared by the task",
           "type": "string"

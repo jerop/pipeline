@@ -110,4 +110,8 @@ type WorkspacePipelineTaskBinding struct {
 	// for this binding (i.e. the volume will be mounted at this sub directory).
 	// +optional
 	SubPath string `json:"subPath,omitempty"`
+	// From is the list of PipelineTask names that have to operate on this
+	// workspace before this task. Implies an ordering in the execution graph.
+	// +optional
+	From string `json:"from,omitempty"`
 }
