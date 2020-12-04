@@ -78,28 +78,60 @@ var pts = []v1beta1.PipelineTask{{
 }, {
 	Name:    "mytask10",
 	TaskRef: &v1beta1.TaskRef{Name: "taskWithWhenExpressions"},
-	WhenExpressions: []v1beta1.WhenExpression{{
-		Input:    "foo",
-		Operator: selection.In,
-		Values:   []string{"foo", "bar"},
-	}},
+	When: &v1beta1.UnscopedOrScopedWhenExpressions{
+		WhenExpressions: []v1beta1.WhenExpression{{
+			Input:    "foo",
+			Operator: selection.In,
+			Values:   []string{"foo", "bar"},
+		}},
+	},
 }, {
 	Name:    "mytask11",
 	TaskRef: &v1beta1.TaskRef{Name: "taskWithWhenExpressions"},
-	WhenExpressions: []v1beta1.WhenExpression{{
-		Input:    "foo",
-		Operator: selection.NotIn,
-		Values:   []string{"foo", "bar"},
-	}},
+	When: &v1beta1.UnscopedOrScopedWhenExpressions{
+		WhenExpressions: []v1beta1.WhenExpression{{
+			Input:    "foo",
+			Operator: selection.NotIn,
+			Values:   []string{"foo", "bar"},
+		}},
+	},
 }, {
 	Name:    "mytask12",
 	TaskRef: &v1beta1.TaskRef{Name: "taskWithWhenExpressions"},
-	WhenExpressions: []v1beta1.WhenExpression{{
-		Input:    "foo",
-		Operator: selection.In,
-		Values:   []string{"foo", "bar"},
-	}},
+	When: &v1beta1.UnscopedOrScopedWhenExpressions{
+		WhenExpressions: []v1beta1.WhenExpression{{
+			Input:    "foo",
+			Operator: selection.In,
+			Values:   []string{"foo", "bar"},
+		}},
+	},
 	RunAfter: []string{"mytask1"},
+}, {
+	Name:    "mytask13",
+	TaskRef: &v1beta1.TaskRef{Name: "taskWithWhenExpressions"},
+	When: &v1beta1.UnscopedOrScopedWhenExpressions{
+		ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+			Scope: v1beta1.Node,
+			WhenExpressions: []v1beta1.WhenExpression{{
+				Input:    "foo",
+				Operator: selection.In,
+				Values:   []string{"bar"},
+			}},
+		},
+	},
+}, {
+	Name:    "mytask14",
+	TaskRef: &v1beta1.TaskRef{Name: "taskWithWhenExpressions"},
+	When: &v1beta1.UnscopedOrScopedWhenExpressions{
+		ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+			Scope: v1beta1.Branch,
+			WhenExpressions: []v1beta1.WhenExpression{{
+				Input:    "foo",
+				Operator: selection.NotIn,
+				Values:   []string{"foo", "bar"},
+			}},
+		},
+	},
 }}
 
 var p = &v1beta1.Pipeline{
@@ -836,6 +868,339 @@ func TestIsSkipped(t *testing.T) {
 		expected: map[string]bool{
 			"mytask12": false,
 		},
+	}, {
+		name: "tasks-when-expression-skip-from-parent",
+		state: PipelineRunState{{
+			PipelineTask: &pts[10],
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask14",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask11"},
+			}, // mytask14 runAfter mytask11
+			TaskRunName: "pipelinerun-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask11": true,
+			"mytask14": true,
+		},
+	}, {
+		name: "tasks-when-expression-run-ordering-dependent-task",
+		state: PipelineRunState{{
+			PipelineTask: &pts[12], // mytask13
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask13"},
+			}, // mytask15 runAfter mytask13
+			TaskRunName: "pipelinerun-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask13": true,
+			"mytask15": false,
+		},
+	}, {
+		name: "tasks-when-expression-run-multiple-ordering-dependent-tasks",
+		state: PipelineRunState{{
+			PipelineTask: &pts[12], // mytask13
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask13"},
+			}, // mytask15 runAfter mytask13
+			TaskRunName: "pipelinerun-ordering-dependent-task-1",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask16",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask13"},
+			}, // mytask16 runAfter mytask13
+			TaskRunName: "pipelinerun-ordering-dependent-task-2",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask13": true,
+			"mytask15": false,
+			"mytask16": false,
+		},
+	}, {
+		name: "tasks-multiple-when-expressions-run-multiple-ordering-dependent-tasks",
+		state: PipelineRunState{{
+			PipelineTask: &pts[12], // mytask13
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask13"},
+			}, // mytask15 runAfter mytask13
+			TaskRunName: "pipelinerun-ordering-dependent-task-1",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:    "mytask16",
+				TaskRef: &v1beta1.TaskRef{Name: "task"},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+						Scope: v1beta1.Node,
+						WhenExpressions: []v1beta1.WhenExpression{{
+							Input:    "foo",
+							Operator: selection.In,
+							Values:   []string{"bar"},
+						}},
+					},
+				},
+				RunAfter: []string{"mytask13"},
+			}, // mytask16 runAfter mytask13
+			TaskRunName: "pipelinerun-guarded-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask17",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask16"},
+			}, // mytask17 runAfter mytask16
+			TaskRunName: "pipelinerun-ordering-dependent-task-2",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask13": true,
+			"mytask15": false,
+			"mytask16": true,
+			"mytask17": false,
+		},
+	}, {
+		name: "tasks-when-expression-run-ordering-dependent-task-with-co-parent",
+		state: PipelineRunState{{
+			PipelineTask: &pts[0], // mytask1
+			TaskRunName:  "pipelinerun-unguardedtask",
+			TaskRun:      makeSucceeded(trs[0]),
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &pts[12], // mytask13
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask16",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask1", "mytask13"},
+			}, // mytask16 runAfter mytask1, mytask13
+			TaskRunName: "pipelinerun-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask1":  false,
+			"mytask13": true,
+			"mytask16": false,
+		},
+	}, {
+		name: "tasks-when-expression-skip-ordering-dependent-task",
+		state: PipelineRunState{{
+			PipelineTask: &pts[13], // mytask14
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask14"},
+			}, // mytask15 runAfter mytask14
+			TaskRunName: "pipelinerun-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask14": true,
+			"mytask15": true,
+		},
+	}, {
+		name: "tasks-when-expression-skip-multiple-ordering-dependent-tasks",
+		state: PipelineRunState{{
+			PipelineTask: &pts[13], // mytask14
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask14"},
+			}, // mytask15 runAfter mytask14
+			TaskRunName: "pipelinerun-ordering-dependent-task-1",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask16",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask14"},
+			}, // mytask16 runAfter mytask14
+			TaskRunName: "pipelinerun-ordering-dependent-task-2",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask14": true,
+			"mytask15": true,
+			"mytask16": true,
+		},
+	}, {
+		name: "tasks-multiple-when-expressions-skip-multiple-ordering-dependent-tasks",
+		state: PipelineRunState{{
+			PipelineTask: &pts[13], // mytask14
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask15",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask14"},
+			}, // mytask15 runAfter mytask14
+			TaskRunName: "pipelinerun-ordering-dependent-task-1",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:    "mytask16",
+				TaskRef: &v1beta1.TaskRef{Name: "task"},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+						Scope: v1beta1.Node,
+						WhenExpressions: []v1beta1.WhenExpression{{
+							Input:    "foo",
+							Operator: selection.In,
+							Values:   []string{"bar"},
+						}},
+					},
+				},
+				RunAfter: []string{"mytask14"},
+			}, // mytask16 runAfter mytask14
+			TaskRunName: "pipelinerun-guarded-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask17",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask16"},
+			}, // mytask17 runAfter mytask16
+			TaskRunName: "pipelinerun-ordering-dependent-task-2",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask14": true,
+			"mytask15": true,
+			"mytask16": true,
+			"mytask17": true,
+		},
+	}, {
+		name: "tasks-when-expression-skip-ordering-dependent-task-with-co-parent",
+		state: PipelineRunState{{
+			PipelineTask: &pts[0], // mytask1
+			TaskRunName:  "pipelinerun-unguardedtask",
+			TaskRun:      makeSucceeded(trs[0]),
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &pts[13], // mytask14
+			TaskRunName:  "pipelinerun-guardedtask",
+			TaskRun:      nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}, {
+			PipelineTask: &v1beta1.PipelineTask{
+				Name:     "mytask16",
+				TaskRef:  &v1beta1.TaskRef{Name: "task"},
+				RunAfter: []string{"mytask1", "mytask14"},
+			}, // mytask16 runAfter mytask1, mytask14
+			TaskRunName: "pipelinerun-ordering-dependent-task",
+			TaskRun:     nil,
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskSpec: &task.Spec,
+			},
+		}},
+		expected: map[string]bool{
+			"mytask1":  false,
+			"mytask14": true,
+			"mytask16": true,
+		},
 	}}
 
 	for _, tc := range tcs {
@@ -856,7 +1221,7 @@ func TestIsSkipped(t *testing.T) {
 					t.Fatalf("Could not get task %s from the state: %v", taskName, tc.state)
 				}
 				if d := cmp.Diff(isSkipped, rprt.Skip(&facts)); d != "" {
-					t.Errorf("Didn't get expected isSkipped %s", diff.PrintWantGot(d))
+					t.Errorf("Didn't get expected isSkipped from task %s: %s", taskName, diff.PrintWantGot(d))
 				}
 			}
 		})
@@ -1826,9 +2191,11 @@ func TestResolvePipeline_WhenExpressions(t *testing.T) {
 	}
 
 	pt := v1beta1.PipelineTask{
-		Name:            "mytask1",
-		TaskRef:         &v1beta1.TaskRef{Name: "task"},
-		WhenExpressions: []v1beta1.WhenExpression{ptwe1},
+		Name:    "mytask1",
+		TaskRef: &v1beta1.TaskRef{Name: "task"},
+		When: &v1beta1.UnscopedOrScopedWhenExpressions{
+			WhenExpressions: []v1beta1.WhenExpression{ptwe1},
+		},
 	}
 
 	providedResources := map[string]*resourcev1alpha1.PipelineResource{}

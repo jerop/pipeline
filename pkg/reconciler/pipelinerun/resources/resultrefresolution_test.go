@@ -229,21 +229,25 @@ func TestResolveResultRefs(t *testing.T) {
 		PipelineTask: &v1beta1.PipelineTask{
 			Name:    "bTask",
 			TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-			WhenExpressions: []v1beta1.WhenExpression{{
-				Input:    "$(tasks.aTask.results.aResult)",
-				Operator: selection.In,
-				Values:   []string{"$(tasks.aTask.results.aResult)"},
-			}},
+			When: &v1beta1.UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []v1beta1.WhenExpression{{
+					Input:    "$(tasks.aTask.results.aResult)",
+					Operator: selection.In,
+					Values:   []string{"$(tasks.aTask.results.aResult)"},
+				}},
+			},
 		},
 	}, {
 		PipelineTask: &v1beta1.PipelineTask{
 			Name:    "bTask",
 			TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-			WhenExpressions: []v1beta1.WhenExpression{{
-				Input:    "$(tasks.aTask.results.missingResult)",
-				Operator: selection.In,
-				Values:   []string{"$(tasks.aTask.results.missingResult)"},
-			}},
+			When: &v1beta1.UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []v1beta1.WhenExpression{{
+					Input:    "$(tasks.aTask.results.missingResult)",
+					Operator: selection.In,
+					Values:   []string{"$(tasks.aTask.results.missingResult)"},
+				}},
+			},
 		},
 	}, {
 		PipelineTask: &v1beta1.PipelineTask{

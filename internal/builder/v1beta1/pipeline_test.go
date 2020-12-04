@@ -59,6 +59,12 @@ func TestPipeline(t *testing.T) {
 			tb.RunAfter("foo"),
 			tb.PipelineTaskTimeout(5*time.Second),
 		),
+		tb.PipelineTask("scoped-never-gonna", "give-you-up",
+			tb.PipelineTaskScopedWhenExpression("foo", selection.In, []string{"foo", "bar"}),
+			tb.PipelineTaskWhenScope("Branch"),
+			tb.RunAfter("foo"),
+			tb.PipelineTaskTimeout(5*time.Second),
+		),
 		tb.PipelineTask("foo", "", tb.PipelineTaskSpec(getTaskSpec())),
 		tb.PipelineTask("task-with-taskSpec", "",
 			tb.TaskSpecMetadata(v1beta1.PipelineTaskMetadata{
@@ -139,11 +145,32 @@ func TestPipeline(t *testing.T) {
 					}},
 				},
 			}, {
-				Name:            "never-gonna",
-				TaskRef:         &v1beta1.TaskRef{Name: "give-you-up"},
-				WhenExpressions: []v1beta1.WhenExpression{{Input: "foo", Operator: selection.In, Values: []string{"foo", "bar"}}},
-				RunAfter:        []string{"foo"},
-				Timeout:         &metav1.Duration{Duration: 5 * time.Second},
+				Name:    "never-gonna",
+				TaskRef: &v1beta1.TaskRef{Name: "give-you-up"},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "foo",
+						Operator: selection.In,
+						Values:   []string{"foo", "bar"},
+					}},
+				},
+				RunAfter: []string{"foo"},
+				Timeout:  &metav1.Duration{Duration: 5 * time.Second},
+			}, {
+				Name:    "scoped-never-gonna",
+				TaskRef: &v1beta1.TaskRef{Name: "give-you-up"},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+						Scope: v1beta1.Branch,
+						WhenExpressions: []v1beta1.WhenExpression{{
+							Input:    "foo",
+							Operator: selection.In,
+							Values:   []string{"foo", "bar"},
+						}},
+					},
+				},
+				RunAfter: []string{"foo"},
+				Timeout:  &metav1.Duration{Duration: 5 * time.Second},
 			}, {
 				Name: "foo",
 				TaskSpec: &v1beta1.EmbeddedTask{

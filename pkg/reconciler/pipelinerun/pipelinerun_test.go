@@ -809,11 +809,13 @@ func TestUpdateTaskRunsState(t *testing.T) {
 	pr := tb.PipelineRun("test-pipeline-run", tb.PipelineRunNamespace("foo"), tb.PipelineRunSpec("test-pipeline"))
 	pipelineTask := v1beta1.PipelineTask{
 		Name: "unit-test-1",
-		WhenExpressions: []v1beta1.WhenExpression{{
-			Input:    "foo",
-			Operator: selection.In,
-			Values:   []string{"foo", "bar"},
-		}},
+		When: &v1beta1.UnscopedOrScopedWhenExpressions{
+			WhenExpressions: []v1beta1.WhenExpression{{
+				Input:    "foo",
+				Operator: selection.In,
+				Values:   []string{"foo", "bar"},
+			}},
+		},
 		TaskRef: &v1beta1.TaskRef{Name: "unit-test-task"},
 	}
 	task := tb.Task("unit-test-task", tb.TaskSpec(

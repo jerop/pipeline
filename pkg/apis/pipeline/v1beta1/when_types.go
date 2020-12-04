@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -47,6 +48,55 @@ type WhenExpression struct {
 	// it represents a DeprecatedInput's relationship to the DeprecatedValues
 	// +optional
 	DeprecatedValues []string `json:"Values,omitempty"`
+}
+
+type WhenScope string
+
+const (
+	Branch WhenScope = "Branch"
+	Node   WhenScope = "Node"
+)
+
+type ScopedWhenExpressions struct {
+	Scope           WhenScope       `json:"scope"`
+	WhenExpressions WhenExpressions `json:"expressions"`
+}
+
+type UnscopedOrScopedWhenExpressions struct {
+	// WhenExpressions is a list of when expressions that need to be true for the task to run
+	// +optional
+	WhenExpressions WhenExpressions `json:"unscopedWhenExpressions,omitempty"`
+
+	// ScopedWhenExpressions is a list of when expressions that need to be true for the task to run
+	// +optional
+	ScopedWhenExpressions ScopedWhenExpressions `json:"scopedWhenExpressions,omitempty"`
+}
+
+func (w *UnscopedOrScopedWhenExpressions) UnmarshalJSON(value []byte) error {
+	if value[0] == '[' {
+		return json.Unmarshal(value, &w.WhenExpressions)
+	}
+	return json.Unmarshal(value, &w.ScopedWhenExpressions)
+}
+
+func (w UnscopedOrScopedWhenExpressions) MarshalJSON() ([]byte, error) {
+	if w.ScopedWhenExpressions.WhenExpressions != nil {
+		return json.Marshal(w.ScopedWhenExpressions)
+	}
+	return json.Marshal(w.WhenExpressions)
+}
+
+func (w *UnscopedOrScopedWhenExpressions) SetDefaults() {
+	if w.ScopedWhenExpressions.WhenExpressions != nil && w.ScopedWhenExpressions.Scope != Node {
+		w.ScopedWhenExpressions.Scope = Branch
+	}
+}
+
+func (w *UnscopedOrScopedWhenExpressions) GetWhenExpressions() WhenExpressions {
+	if w.WhenExpressions != nil {
+		return w.WhenExpressions
+	}
+	return w.ScopedWhenExpressions.WhenExpressions
 }
 
 // GetInput returns the input string for guard checking
@@ -157,4 +207,17 @@ func (wes WhenExpressions) ReplaceWhenExpressionsVariables(replacements map[stri
 		replaced[i] = wes[i].applyReplacements(replacements)
 	}
 	return replaced
+}
+
+func (w *UnscopedOrScopedWhenExpressions) ReplaceWhenExpressionsVariables(replacements map[string]string) *UnscopedOrScopedWhenExpressions {
+	if w == nil {
+		return nil
+	}
+	replaced := *w
+	if w.WhenExpressions != nil {
+		replaced.WhenExpressions = w.WhenExpressions.ReplaceWhenExpressionsVariables(replacements)
+	} else {
+		replaced.ScopedWhenExpressions.WhenExpressions = w.ScopedWhenExpressions.WhenExpressions.ReplaceWhenExpressionsVariables(replacements)
+	}
+	return &replaced
 }

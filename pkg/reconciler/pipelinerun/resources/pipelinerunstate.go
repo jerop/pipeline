@@ -125,8 +125,11 @@ func (state PipelineRunState) GetTaskRunsStatus(pr *v1beta1.PipelineRun) map[str
 		if prtrs == nil {
 			prtrs = &v1beta1.PipelineRunTaskRunStatus{
 				PipelineTaskName: rprt.PipelineTask.Name,
-				WhenExpressions:  rprt.PipelineTask.WhenExpressions,
 			}
+		}
+
+		if rprt.PipelineTask.When != nil {
+			prtrs.WhenExpressions = rprt.PipelineTask.When.GetWhenExpressions()
 		}
 
 		if rprt.TaskRun != nil {
@@ -315,8 +318,10 @@ func (facts *PipelineRunFacts) GetSkippedTasks() []v1beta1.SkippedTask {
 	for _, rprt := range facts.State {
 		if rprt.Skip(facts) {
 			skippedTask := v1beta1.SkippedTask{
-				Name:            rprt.PipelineTask.Name,
-				WhenExpressions: rprt.PipelineTask.WhenExpressions,
+				Name: rprt.PipelineTask.Name,
+			}
+			if _, reason := rprt.skip(facts); reason == ReasonWhenExpressionsSkip {
+				skippedTask.WhenExpressions = rprt.PipelineTask.When.GetWhenExpressions()
 			}
 			skipped = append(skipped, skippedTask)
 		}

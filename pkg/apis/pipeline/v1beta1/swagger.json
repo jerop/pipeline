@@ -1090,7 +1090,7 @@
       "type": "object",
       "properties": {
         "conditions": {
-          "description": "Conditions is a list of conditions that need to be true for the task to run Conditions are deprecated, use WhenExpressions instead",
+          "description": "Conditions is a list of conditions that need to be true for the task to run Conditions are deprecated, use When instead",
           "type": "array",
           "items": {
             "$ref": "#/definitions/v1beta1.PipelineTaskCondition"
@@ -1136,11 +1136,8 @@
           "$ref": "#/definitions/v1.Duration"
         },
         "when": {
-          "description": "WhenExpressions is a list of when expressions that need to be true for the task to run",
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1beta1.WhenExpression"
-          }
+          "description": "When is a list of when expressions that need to be true for the task to run",
+          "$ref": "#/definitions/v1beta1.UnscopedOrScopedWhenExpressions"
         },
         "workspaces": {
           "description": "Workspaces maps workspaces from the pipeline spec to the workspaces declared in the Task.",
@@ -1331,6 +1328,24 @@
           "type": "string"
         },
         "Result": {
+          "type": "string"
+        }
+      }
+    },
+    "v1beta1.ScopedWhenExpressions": {
+      "type": "object",
+      "required": [
+        "scope",
+        "expressions"
+      ],
+      "properties": {
+        "expressions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1beta1.WhenExpression"
+          }
+        },
+        "scope": {
           "type": "string"
         }
       }
@@ -2216,6 +2231,22 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/v1beta1.WorkspaceDeclaration"
+          }
+        }
+      }
+    },
+    "v1beta1.UnscopedOrScopedWhenExpressions": {
+      "type": "object",
+      "properties": {
+        "scopedWhenExpressions": {
+          "description": "ScopedWhenExpressions is a list of when expressions that need to be true for the task to run",
+          "$ref": "#/definitions/v1beta1.ScopedWhenExpressions"
+        },
+        "unscopedWhenExpressions": {
+          "description": "WhenExpressions is a list of when expressions that need to be true for the task to run",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1beta1.WhenExpression"
           }
         }
       }

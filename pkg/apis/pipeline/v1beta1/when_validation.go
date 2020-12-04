@@ -32,6 +32,25 @@ var validWhenOperators = []string{
 	string(selection.NotIn),
 }
 
+func (w *UnscopedOrScopedWhenExpressions) validate() *apis.FieldError {
+	errs := w.WhenExpressions.validate()
+	return errs.Also(w.ScopedWhenExpressions.validate())
+}
+
+func (w *ScopedWhenExpressions) validate() *apis.FieldError {
+	errs := w.WhenExpressions.validate()
+	return errs.Also(w.Scope.validate())
+}
+
+func (w WhenScope) validate() *apis.FieldError {
+	validScope := []string{string(Branch), string(Node)}
+	if !sets.NewString(validScope...).Has(string(w)) {
+		message := fmt.Sprintf("scope %q is not recognized. valid scope: %s", w, strings.Join(validScope, ","))
+		return apis.ErrInvalidValue(message, apis.CurrentField)
+	}
+	return nil
+}
+
 func (wes WhenExpressions) validate() *apis.FieldError {
 	errs := wes.validateWhenExpressionsFields().ViaField("when")
 	return errs.Also(wes.validateTaskResultsVariables().ViaField("when"))

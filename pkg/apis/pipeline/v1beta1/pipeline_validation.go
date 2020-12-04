@@ -228,7 +228,9 @@ func validatePipelineParameterVariables(tasks []PipelineTask, params []ParamSpec
 func validatePipelineParametersVariables(tasks []PipelineTask, prefix string, paramNames sets.String, arrayParamNames sets.String) (errs *apis.FieldError) {
 	for idx, task := range tasks {
 		errs = errs.Also(validatePipelineParametersVariablesInTaskParameters(task.Params, prefix, paramNames, arrayParamNames).ViaIndex(idx))
-		errs = errs.Also(task.WhenExpressions.validatePipelineParametersVariables(prefix, paramNames, arrayParamNames).ViaIndex(idx))
+		if task.When != nil {
+			errs = errs.Also(task.When.GetWhenExpressions().validatePipelineParametersVariables(prefix, paramNames, arrayParamNames).ViaIndex(idx))
+		}
 	}
 	return errs
 }
@@ -324,7 +326,7 @@ func validateFinalTasks(finalTasks []PipelineTask) *apis.FieldError {
 		if len(f.Conditions) != 0 {
 			return apis.ErrInvalidValue(fmt.Sprintf("no conditions allowed under spec.finally, final task %s has conditions specified", f.Name), "").ViaFieldIndex("finally", idx)
 		}
-		if len(f.WhenExpressions) != 0 {
+		if f.When != nil {
 			return apis.ErrInvalidValue(fmt.Sprintf("no when expressions allowed under spec.finally, final task %s has when expressions specified", f.Name), "").ViaFieldIndex("finally", idx)
 		}
 	}
@@ -374,13 +376,15 @@ func validateTasksInputFrom(tasks []PipelineTask) (errs *apis.FieldError) {
 func validateWhenExpressions(tasks []PipelineTask) (errs *apis.FieldError) {
 	for i, t := range tasks {
 		errs = errs.Also(validateOneOfWhenExpressionsOrConditions(t).ViaFieldIndex("tasks", i))
-		errs = errs.Also(t.WhenExpressions.validate().ViaFieldIndex("tasks", i))
+		if t.When != nil {
+			errs = errs.Also(t.When.GetWhenExpressions().validate().ViaFieldIndex("tasks", i))
+		}
 	}
 	return errs
 }
 
 func validateOneOfWhenExpressionsOrConditions(t PipelineTask) *apis.FieldError {
-	if t.WhenExpressions != nil && t.Conditions != nil {
+	if t.When != nil && t.Conditions != nil {
 		return apis.ErrMultipleOneOf("when", "conditions")
 	}
 	return nil

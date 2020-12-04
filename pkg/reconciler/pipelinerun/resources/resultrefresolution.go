@@ -156,11 +156,13 @@ func convertToResultRefs(pipelineRunState PipelineRunState, target *ResolvedPipe
 	}
 	resolvedResultRefs = append(resolvedResultRefs, taskParamsRefs...)
 
-	taskWhenExpressionsRefs, err := convertWhenExpressions(target.PipelineTask.WhenExpressions, pipelineRunState, target.PipelineTask.Name)
-	if err != nil {
-		return nil, err
+	if target.PipelineTask.When != nil {
+		taskWhenExpressionsRefs, err := convertWhenExpressions(target.PipelineTask.When.GetWhenExpressions(), pipelineRunState, target.PipelineTask.Name)
+		if err != nil {
+			return nil, err
+		}
+		resolvedResultRefs = append(resolvedResultRefs, taskWhenExpressionsRefs...)
 	}
-	resolvedResultRefs = append(resolvedResultRefs, taskWhenExpressionsRefs...)
 
 	return resolvedResultRefs, nil
 }

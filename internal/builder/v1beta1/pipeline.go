@@ -351,11 +351,48 @@ func PipelineTaskConditionResource(name, resource string, from ...string) Pipeli
 // which are used to determine whether the PipelineTask should be executed or skipped.
 func PipelineTaskWhenExpression(input string, operator selection.Operator, values []string) PipelineTaskOp {
 	return func(pt *v1beta1.PipelineTask) {
-		pt.WhenExpressions = append(pt.WhenExpressions, v1beta1.WhenExpression{
+		if pt.When == nil {
+			pt.When = &v1beta1.UnscopedOrScopedWhenExpressions{
+				WhenExpressions: v1beta1.WhenExpressions{},
+			}
+		}
+		pt.When.WhenExpressions = append(pt.When.WhenExpressions, v1beta1.WhenExpression{
 			Input:    input,
 			Operator: operator,
 			Values:   values,
 		})
+	}
+}
+
+// PipelineTaskScopedWhenExpression adds a WhenExpression with the specified input, operator and values
+// which are used to determine whether the PipelineTask should be executed or skipped.
+func PipelineTaskScopedWhenExpression(input string, operator selection.Operator, values []string) PipelineTaskOp {
+	return func(pt *v1beta1.PipelineTask) {
+		if pt.When == nil {
+			pt.When = &v1beta1.UnscopedOrScopedWhenExpressions{
+				ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{
+					Scope:           v1beta1.Branch,
+					WhenExpressions: v1beta1.WhenExpressions{},
+				},
+			}
+		}
+		pt.When.ScopedWhenExpressions.WhenExpressions = append(pt.When.ScopedWhenExpressions.WhenExpressions, v1beta1.WhenExpression{
+			Input:    input,
+			Operator: operator,
+			Values:   values,
+		})
+	}
+}
+
+// PipelineTaskWhenScope adds a WhenScope which is used to determine the scope of the WhenExpressions in a PipelineTask
+func PipelineTaskWhenScope(scope v1beta1.WhenScope) PipelineTaskOp {
+	return func(pt *v1beta1.PipelineTask) {
+		if pt.When == nil {
+			pt.When = &v1beta1.UnscopedOrScopedWhenExpressions{
+				ScopedWhenExpressions: v1beta1.ScopedWhenExpressions{},
+			}
+		}
+		pt.When.ScopedWhenExpressions.Scope = scope
 	}
 }
 

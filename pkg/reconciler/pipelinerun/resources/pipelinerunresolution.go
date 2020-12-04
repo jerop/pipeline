@@ -133,16 +133,37 @@ func (t *ResolvedPipelineRunTask) checkParentsDone(facts *PipelineRunFacts) bool
 	return true
 }
 
-func (t *ResolvedPipelineRunTask) skip(facts *PipelineRunFacts) bool {
+type SkipReason string
+
+const (
+	ReasonIsStopping          SkipReason = "IsStopping"
+	ReasonParentTasksSkip     SkipReason = "ParentTasksSkip"
+	ReasonWhenExpressionsSkip SkipReason = "WhenExpressionsSkip"
+	ReasonConditionsSkip      SkipReason = "ConditionsSkip"
+)
+
+func (t *ResolvedPipelineRunTask) skip(facts *PipelineRunFacts) (bool, SkipReason) {
 	if facts.isFinalTask(t.PipelineTask.Name) || t.IsStarted() {
-		return false
+		return false, ""
 	}
 
-	if t.conditionsSkip() || t.whenExpressionsSkip(facts) || t.parentTasksSkip(facts) || facts.IsStopping() {
-		return true
+	if facts.IsStopping() {
+		return true, ReasonIsStopping
 	}
 
-	return false
+	if t.parentTasksSkip(facts) {
+		return true, ReasonParentTasksSkip
+	}
+
+	if t.whenExpressionsSkip(facts) {
+		return true, ReasonWhenExpressionsSkip
+	}
+
+	if t.conditionsSkip() {
+		return true, ReasonConditionsSkip
+	}
+
+	return false, ""
 }
 
 // Skip returns true if a PipelineTask will not be run because
@@ -156,7 +177,7 @@ func (t *ResolvedPipelineRunTask) Skip(facts *PipelineRunFacts) bool {
 		facts.SkipCache = make(map[string]bool)
 	}
 	if _, cached := facts.SkipCache[t.PipelineTask.Name]; !cached {
-		facts.SkipCache[t.PipelineTask.Name] = t.skip(facts) // t.skip() is same as our existing t.Skip()
+		facts.SkipCache[t.PipelineTask.Name], _ = t.skip(facts) // t.skip() is same as our existing t.Skip()
 	}
 	return facts.SkipCache[t.PipelineTask.Name]
 }
@@ -171,13 +192,10 @@ func (t *ResolvedPipelineRunTask) conditionsSkip() bool {
 }
 
 func (t *ResolvedPipelineRunTask) whenExpressionsSkip(facts *PipelineRunFacts) bool {
-	if t.checkParentsDone(facts) {
-		if len(t.PipelineTask.WhenExpressions) > 0 {
-			if !t.PipelineTask.WhenExpressions.HaveVariables() {
-				if !t.PipelineTask.WhenExpressions.AllowsExecution() {
-					return true
-				}
-			}
+	if t.checkParentsDone(facts) && t.PipelineTask.When != nil {
+		we := t.PipelineTask.When.GetWhenExpressions()
+		if len(we) > 0 && !we.HaveVariables() && !we.AllowsExecution() {
+			return true
 		}
 	}
 	return false
@@ -187,7 +205,14 @@ func (t *ResolvedPipelineRunTask) parentTasksSkip(facts *PipelineRunFacts) bool 
 	stateMap := facts.State.ToMap()
 	node := facts.TasksGraph.Nodes[t.PipelineTask.Name]
 	for _, p := range node.Prev {
-		if stateMap[p.Task.HashKey()].Skip(facts) {
+		parentTask := stateMap[p.Task.HashKey()]
+		if parentTask.Skip(facts) {
+			// exempted if the parent task was skipped due to its when expressions evaluating to false while scope is Node
+			if skip, reason := parentTask.skip(facts); skip && reason == ReasonWhenExpressionsSkip {
+				if parentTask.PipelineTask.When.ScopedWhenExpressions.Scope == v1beta1.Node {
+					return false
+				}
+			}
 			return true
 		}
 	}

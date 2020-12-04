@@ -16,9 +16,14 @@ spec:
     tasks:
       - name: create-file # when expression using parameter, evaluates to true
         when:
+          scope: "Branch"
+          expressions:
           - input: "$(params.path)"
             operator: in
             values: ["README.md"]
+          - input: "$(params.path)"
+            operator: in
+            values: [ "README.md"]
         workspaces:
           - name: source
             workspace: source
@@ -59,9 +64,14 @@ spec:
                 fi
       - name: echo-file-exists # when expression using task result, evaluates to true
         when:
+          scope: "Branch"
+          expressions:
           - input: "$(tasks.check-file.results.exists)"
             operator: in
             values: ["yes"]
+          - input: "$(tasks.check-file.results.exists)"
+            operator: in
+            values: [ "yes" ]
         taskSpec:
           steps:
             - name: echo
@@ -69,9 +79,14 @@ spec:
               script: 'echo file exists'
       - name: task-should-be-skipped-1
         when:
+          scope: "Branch"
+          expressions:
           - input: "$(tasks.check-file.results.exists)" # when expression using task result, evaluates to false
             operator: in
             values: ["missing"]
+          - input: "$(tasks.check-file.results.exists)" # when expression using task result, evaluates to false
+            operator: in
+            values: [ "missing" ]
         taskSpec:
           steps:
             - name: echo
@@ -82,6 +97,9 @@ spec:
           - input: "$(params.path)"
             operator: notin
             values: ["README.md"]
+          - input: "$(params.path)"
+            operator: notin
+            values: [ "README.md" ]
         taskSpec:
           steps:
             - name: echo
@@ -91,9 +109,14 @@ spec:
         runAfter:
           - echo-file-exists
         when:
+          scope: "Branch"
+          expressions:
           - input: "monday"
             operator: in
             values: ["friday"]
+          - input: "monday"
+            operator: in
+            values: [ "friday" ]
         taskSpec:
           steps:
             - name: echo

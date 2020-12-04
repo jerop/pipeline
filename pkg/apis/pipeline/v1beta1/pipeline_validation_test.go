@@ -231,11 +231,13 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			Tasks: []PipelineTask{{
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:    "foo",
-					Operator: selection.In,
-					Values:   []string{"bar"},
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:    "foo",
+						Operator: selection.In,
+						Values:   []string{"bar"},
+					}},
+				},
 				Conditions: []PipelineTaskCondition{{
 					ConditionRef: "some-condition",
 				}},
@@ -252,11 +254,13 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			Tasks: []PipelineTask{{
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "bar-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:    "foo",
-					Operator: selection.Exists,
-					Values:   []string{"foo"},
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:    "foo",
+						Operator: selection.Exists,
+						Values:   []string{"foo"},
+					}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -270,11 +274,13 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			Tasks: []PipelineTask{{
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:    "foo",
-					Operator: selection.In,
-					Values:   []string{},
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:    "foo",
+						Operator: selection.In,
+						Values:   []string{},
+					}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -288,10 +294,12 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			Tasks: []PipelineTask{{
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:  "foo",
-					Values: []string{"foo"},
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:  "foo",
+						Values: []string{"foo"},
+					}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -305,10 +313,12 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			Tasks: []PipelineTask{{
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:    "foo",
-					Operator: selection.In,
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:    "foo",
+						Operator: selection.In,
+					}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -325,11 +335,13 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 			}, {
 				Name:    "invalid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{
-					Input:    "$(tasks.a-task.resultTypo.bResult)",
-					Operator: selection.In,
-					Values:   []string{"bar"},
-				}},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{
+						Input:    "$(tasks.a-task.resultTypo.bResult)",
+						Operator: selection.In,
+						Values:   []string{"bar"},
+					}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -344,9 +356,11 @@ func TestPipelineSpec_Validate_Failure(t *testing.T) {
 				Name:    "valid-pipeline-task",
 				TaskRef: &TaskRef{Name: "foo-task"},
 			}, {
-				Name:            "invalid-pipeline-task",
-				TaskRef:         &TaskRef{Name: "foo-task"},
-				WhenExpressions: []WhenExpression{{}},
+				Name:    "invalid-pipeline-task",
+				TaskRef: &TaskRef{Name: "foo-task"},
+				When: &UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []WhenExpression{{}},
+				},
 			}},
 		},
 		expectedError: apis.FieldError{
@@ -1045,15 +1059,17 @@ func TestValidatePipelineParameterVariables_Success(t *testing.T) {
 		tasks: []PipelineTask{{
 			Name:    "bar",
 			TaskRef: &TaskRef{Name: "bar-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "$(params.baz)",
-				Operator: selection.In,
-				Values:   []string{"foo"},
-			}, {
-				Input:    "baz",
-				Operator: selection.In,
-				Values:   []string{"$(params.foo-is-baz)"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "$(params.baz)",
+					Operator: selection.In,
+					Values:   []string{"foo"},
+				}, {
+					Input:    "baz",
+					Operator: selection.In,
+					Values:   []string{"$(params.foo-is-baz)"},
+				}},
+			},
 		}},
 	}, {
 		name: "valid array parameter variables",
@@ -1130,11 +1146,13 @@ func TestValidatePipelineParameterVariables_Failure(t *testing.T) {
 		tasks: []PipelineTask{{
 			Name:    "bar",
 			TaskRef: &TaskRef{Name: "bar-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "$(params.baz)",
-				Operator: selection.In,
-				Values:   []string{"foo"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "$(params.baz)",
+					Operator: selection.In,
+					Values:   []string{"foo"},
+				}},
+			},
 		}},
 		expectedError: apis.FieldError{
 			Message: `non-existent variable in "$(params.baz)"`,
@@ -1145,11 +1163,13 @@ func TestValidatePipelineParameterVariables_Failure(t *testing.T) {
 		tasks: []PipelineTask{{
 			Name:    "bar",
 			TaskRef: &TaskRef{Name: "bar-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "bax",
-				Operator: selection.In,
-				Values:   []string{"$(params.foo-is-baz)"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "bax",
+					Operator: selection.In,
+					Values:   []string{"$(params.foo-is-baz)"},
+				}},
+			},
 		}},
 		expectedError: apis.FieldError{
 			Message: `non-existent variable in "$(params.foo-is-baz)"`,
@@ -1163,11 +1183,13 @@ func TestValidatePipelineParameterVariables_Failure(t *testing.T) {
 		tasks: []PipelineTask{{
 			Name:    "bar",
 			TaskRef: &TaskRef{Name: "bar-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "$(params.foo)",
-				Operator: selection.In,
-				Values:   []string{"foo"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "$(params.foo)",
+					Operator: selection.In,
+					Values:   []string{"foo"},
+				}},
+			},
 		}},
 		expectedError: apis.FieldError{
 			Message: `variable type invalid in "$(params.foo)"`,
@@ -1181,11 +1203,13 @@ func TestValidatePipelineParameterVariables_Failure(t *testing.T) {
 		tasks: []PipelineTask{{
 			Name:    "bar",
 			TaskRef: &TaskRef{Name: "bar-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "bax",
-				Operator: selection.In,
-				Values:   []string{"$(params.foo)"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "bax",
+					Operator: selection.In,
+					Values:   []string{"$(params.foo)"},
+				}},
+			},
 		}},
 		expectedError: apis.FieldError{
 			Message: `variable type invalid in "$(params.foo)"`,
@@ -1894,11 +1918,13 @@ func TestValidateFinalTasks_Failure(t *testing.T) {
 		finalTasks: []PipelineTask{{
 			Name:    "final-task",
 			TaskRef: &TaskRef{Name: "final-task"},
-			WhenExpressions: []WhenExpression{{
-				Input:    "foo",
-				Operator: selection.In,
-				Values:   []string{"foo", "bar"},
-			}},
+			When: &UnscopedOrScopedWhenExpressions{
+				WhenExpressions: []WhenExpression{{
+					Input:    "foo",
+					Operator: selection.In,
+					Values:   []string{"foo", "bar"},
+				}},
+			},
 		}},
 		expectedError: apis.FieldError{
 			Message: `invalid value: no when expressions allowed under spec.finally, final task final-task has when expressions specified`,

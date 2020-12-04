@@ -38,6 +38,9 @@ func (ps *PipelineSpec) SetDefaults(ctx context.Context) {
 		if pt.TaskSpec != nil {
 			pt.TaskSpec.SetDefaults(ctx)
 		}
+		if pt.When != nil {
+			pt.When.SetDefaults()
+		}
 	}
 	for i := range ps.Params {
 		ps.Params[i].SetDefaults(ctx)

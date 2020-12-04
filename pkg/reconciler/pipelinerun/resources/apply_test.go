@@ -72,11 +72,13 @@ func TestApplyParameters(t *testing.T) {
 				{Name: "second-param", Type: v1beta1.ParamTypeString},
 			},
 			Tasks: []v1beta1.PipelineTask{{
-				WhenExpressions: []v1beta1.WhenExpression{{
-					Input:    "$(params.first-param)",
-					Operator: selection.In,
-					Values:   []string{"$(params.second-param)"},
-				}},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "$(params.first-param)",
+						Operator: selection.In,
+						Values:   []string{"$(params.second-param)"},
+					}},
+				},
 			}},
 		},
 		params: []v1beta1.Param{{Name: "second-param", Value: *v1beta1.NewArrayOrString("second-value")}},
@@ -86,11 +88,13 @@ func TestApplyParameters(t *testing.T) {
 				{Name: "second-param", Type: v1beta1.ParamTypeString},
 			},
 			Tasks: []v1beta1.PipelineTask{{
-				WhenExpressions: []v1beta1.WhenExpression{{
-					Input:    "default-value",
-					Operator: selection.In,
-					Values:   []string{"second-value"},
-				}},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "default-value",
+						Operator: selection.In,
+						Values:   []string{"second-value"},
+					}},
+				},
 			}},
 		},
 	}, {
@@ -313,22 +317,26 @@ func TestApplyTaskResults_MinimalExpression(t *testing.T) {
 			PipelineTask: &v1beta1.PipelineTask{
 				Name:    "bTask",
 				TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-				WhenExpressions: []v1beta1.WhenExpression{{
-					Input:    "$(tasks.aTask.results.aResult)",
-					Operator: selection.In,
-					Values:   []string{"$(tasks.aTask.results.aResult)"},
-				}},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "$(tasks.aTask.results.aResult)",
+						Operator: selection.In,
+						Values:   []string{"$(tasks.aTask.results.aResult)"},
+					}},
+				},
 			},
 		}},
 		want: PipelineRunState{{
 			PipelineTask: &v1beta1.PipelineTask{
 				Name:    "bTask",
 				TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-				WhenExpressions: []v1beta1.WhenExpression{{
-					Input:    "aResultValue",
-					Operator: selection.In,
-					Values:   []string{"aResultValue"},
-				}},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "aResultValue",
+						Operator: selection.In,
+						Values:   []string{"aResultValue"},
+					}},
+				},
 			},
 		}},
 	}} {
@@ -391,11 +399,12 @@ func TestApplyTaskResults_EmbeddedExpression(t *testing.T) {
 			PipelineTask: &v1beta1.PipelineTask{
 				Name:    "bTask",
 				TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-				WhenExpressions: []v1beta1.WhenExpression{
-					{
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
 						Input:    "Result value --> $(tasks.aTask.results.aResult)",
 						Operator: selection.In,
 						Values:   []string{"Result value --> $(tasks.aTask.results.aResult)"},
+					},
 					},
 				},
 			},
@@ -404,11 +413,13 @@ func TestApplyTaskResults_EmbeddedExpression(t *testing.T) {
 			PipelineTask: &v1beta1.PipelineTask{
 				Name:    "bTask",
 				TaskRef: &v1beta1.TaskRef{Name: "bTask"},
-				WhenExpressions: []v1beta1.WhenExpression{{
-					Input:    "Result value --> aResultValue",
-					Operator: selection.In,
-					Values:   []string{"Result value --> aResultValue"},
-				}},
+				When: &v1beta1.UnscopedOrScopedWhenExpressions{
+					WhenExpressions: []v1beta1.WhenExpression{{
+						Input:    "Result value --> aResultValue",
+						Operator: selection.In,
+						Values:   []string{"Result value --> aResultValue"},
+					}},
+				},
 			},
 		}},
 	}} {
