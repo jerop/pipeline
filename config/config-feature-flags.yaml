@@ -69,7 +69,7 @@ data:
   enable-custom-tasks: "false"
   # Setting this flag will determine which gated features are enabled.
   # Acceptable values are "stable" or "alpha".
-  enable-api-fields: "stable"
+  enable-api-fields: "alpha"
   # Setting this flag to "false" scopes when expressions to guard a Task and
   # its dependent Tasks. This flag defaults to "true"; when expressions guard
   # the Task only. See TEP-0059 and Pipeline documentation for more details.

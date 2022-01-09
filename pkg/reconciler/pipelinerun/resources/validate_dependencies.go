@@ -35,6 +35,10 @@ func ValidatePipelineTaskResults(state PipelineRunState) error {
 				return fmt.Errorf("invalid result reference in pipeline task %q: %s", rprt.PipelineTask.Name, err)
 			}
 		}
+		//TODO(jerop) TEP-0090: to be supported in future milestones
+		if len(rprt.PipelineTask.Matrix) != 0 && len(rprt.ResolvedTaskResources.TaskSpec.Results) != 0 {
+			return fmt.Errorf("pipeline task with a matrix %q should not produce results", rprt.PipelineTask.Name)
+		}
 	}
 	return nil
 }

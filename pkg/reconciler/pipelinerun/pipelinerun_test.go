@@ -7987,6 +7987,105 @@ func TestReconciler_ReconcileKind_PipelineTaskContext(t *testing.T) {
 	}
 }
 
+func TestReconciler_ReconcileKind_PipelineTaskMatrix(t *testing.T) {
+	names.TestingSeed()
+
+	pipelineName := "p-pipelinetask-status"
+	pipelineRunName := "pr-pipelinetask-status"
+
+	ps := []*v1beta1.Pipeline{{
+		ObjectMeta: baseObjectMeta(pipelineName, "foo"),
+		Spec: v1beta1.PipelineSpec{
+			Tasks: []v1beta1.PipelineTask{{
+				Name: "task1",
+				TaskRef: &v1beta1.TaskRef{
+					Name: "mytask",
+				},
+			}, {
+				Name: "task2",
+				TaskRef: &v1beta1.TaskRef{
+					Name: "mytask",
+				},
+				RunAfter: []string{"task1"},
+				Matrix: []v1beta1.Param{{
+					Name:  "platforms",
+					Value: *v1beta1.NewArrayOrString("linux", "mac", "windows"),
+				}, {
+					Name:  "browsers",
+					Value: *v1beta1.NewArrayOrString("chrome", "safari", "firefox"),
+				}},
+			}},
+		},
+	}}
+
+	prs := []*v1beta1.PipelineRun{{
+		ObjectMeta: baseObjectMeta(pipelineRunName, "foo"),
+		Spec: v1beta1.PipelineRunSpec{
+			PipelineRef:        &v1beta1.PipelineRef{Name: pipelineName},
+			ServiceAccountName: "test-sa",
+		},
+	}}
+
+	ts := []*v1beta1.Task{
+		{ObjectMeta: baseObjectMeta("mytask", "foo")},
+	}
+
+	trs := []*v1beta1.TaskRun{{
+		ObjectMeta: taskRunObjectMeta(pipelineRunName+"-task1-xxyy", "foo", pipelineRunName, pipelineName, "task1", false),
+		Spec: v1beta1.TaskRunSpec{
+			TaskRef: &v1beta1.TaskRef{
+				Name: "mytask",
+			},
+			ServiceAccountName: "test-sa",
+			Resources:          &v1beta1.TaskRunResources{},
+			Timeout:            &metav1.Duration{Duration: config.DefaultTimeoutMinutes * time.Minute},
+		},
+		Status: v1beta1.TaskRunStatus{
+			Status: duckv1beta1.Status{
+				Conditions: duckv1beta1.Conditions{
+					apis.Condition{
+						Type:   apis.ConditionSucceeded,
+						Status: corev1.ConditionTrue,
+						Reason: v1beta1.TaskRunReasonSuccessful.String(),
+					},
+				},
+			},
+		},
+	}}
+
+	cms := getConfigMapsWithEnabledAlphaAPIFields()
+
+	d := test.Data{
+		PipelineRuns: prs,
+		Pipelines:    ps,
+		Tasks:        ts,
+		TaskRuns:     trs,
+		ConfigMaps:   cms,
+	}
+	prt := newPipelineRunTest(d, t)
+	defer prt.Cancel()
+
+	_, clients := prt.reconcileRun("foo", pipelineRunName, []string{}, false)
+
+	// Check that the expected TaskRun was created
+	actual, err := clients.Pipeline.TektonV1beta1().TaskRuns("foo").List(prt.TestAssets.Ctx, metav1.ListOptions{
+		LabelSelector: "tekton.dev/pipelineTask=task2,tekton.dev/pipelineRun=" + pipelineRunName,
+		Limit:         1,
+	})
+
+	if err != nil {
+		t.Fatalf("Failure to list TaskRun's %s", err)
+	}
+	if len(actual.Items) != 9 {
+		t.Fatalf("Expected 9 TaskRuns got %d", len(actual.Items))
+	}
+	actualTaskRuns := actual.Items[0]
+
+	if d := cmp.Diff(&actualTaskRuns, prs[0].Status.TaskRuns, ignoreResourceVersion); d != "" {
+		t.Errorf("Diff %s", diff.PrintWantGot(d))
+	}
+}
+
 func TestReconcileWithTaskResultsInFinalTasks(t *testing.T) {
 	names.TestingSeed()
 

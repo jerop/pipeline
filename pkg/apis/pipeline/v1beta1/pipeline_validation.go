@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"context"
 	"fmt"
+	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"strings"
 
 	"github.com/tektoncd/pipeline/pkg/apis/validate"
@@ -57,7 +58,7 @@ func (ps *PipelineSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	errs = errs.Also(validateFrom(ps.Tasks))
 	// Validate the pipeline task graph
 	errs = errs.Also(validateGraph(ps.Tasks))
-	errs = errs.Also(validateParamResults(ps.Tasks))
+	errs = errs.Also(validateResultsInParameters(ps.Tasks))
 	// The parameter variables should be valid
 	errs = errs.Also(validatePipelineParameterVariables(ps.Tasks, ps.Params).ViaField("tasks"))
 	errs = errs.Also(validatePipelineParameterVariables(ps.Finally, ps.Params).ViaField("finally"))
@@ -71,6 +72,8 @@ func (ps *PipelineSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	errs = errs.Also(validateTasksAndFinallySection(ps))
 	errs = errs.Also(validateFinalTasks(ps.Tasks, ps.Finally))
 	errs = errs.Also(validateWhenExpressions(ps.Tasks, ps.Finally))
+	errs = errs.Also(validateMatrix(ctx, ps.Tasks).ViaField("tasks"))
+	errs = errs.Also(validateMatrix(ctx, ps.Finally).ViaField("finally"))
 	return errs
 }
 
@@ -168,6 +171,7 @@ func validatePipelineParametersVariables(tasks []PipelineTask, prefix string, pa
 	for idx, task := range tasks {
 		errs = errs.Also(validatePipelineParametersVariablesInTaskParameters(task.Params, prefix, paramNames, arrayParamNames).ViaIndex(idx))
 		errs = errs.Also(task.WhenExpressions.validatePipelineParametersVariables(prefix, paramNames, arrayParamNames).ViaIndex(idx))
+		errs = errs.Also(validatePipelineParametersVariablesInTaskMatrix(task.Matrix, task.Params, prefix, paramNames, arrayParamNames).ViaIndex(idx))
 	}
 	return errs
 }
@@ -185,6 +189,9 @@ func validatePipelineContextVariables(tasks []PipelineTask) *apis.FieldError {
 	for _, task := range tasks {
 		for _, param := range task.Params {
 			paramValues = append(paramValues, param.Value.StringVal)
+			paramValues = append(paramValues, param.Value.ArrayVal...)
+		}
+		for _, param := range task.Matrix {
 			paramValues = append(paramValues, param.Value.ArrayVal...)
 		}
 	}
@@ -206,37 +213,46 @@ func validateExecutionStatusVariablesInTasks(tasks []PipelineTask) (errs *apis.F
 		for _, param := range t.Params {
 			// retrieve a list of substitution expression from a param
 			if ps, ok := GetVarSubstitutionExpressionsForParam(param); ok {
-				// validate tasks.pipelineTask.status/tasks.status if this expression is not a result reference
-				if !LooksLikeContainsResultRefs(ps) {
-					for _, p := range ps {
-						// check if it contains context variable accessing execution status - $(tasks.taskname.status)
-						// or an aggregate status - $(tasks.status)
-						if containsExecutionStatusRef(p) {
-							errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("pipeline tasks can not refer to execution status of any other pipeline task"+
-								" or aggregate status of tasks"), "value").ViaFieldKey("params", param.Name).ViaFieldIndex("tasks", idx))
-						}
-					}
+				if containsExecutionStatusReferences(ps) {
+					errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("pipeline tasks can not refer to execution status of any other pipeline task"+
+						" or aggregate status of tasks"), "value").ViaFieldKey("params", param.Name).ViaFieldIndex("tasks", idx))
+				}
+			}
+		}
+		for _, param := range t.Matrix {
+			// retrieve a list of substitution expression from a param in matrix
+			if ps, ok := GetVarSubstitutionExpressionsForParam(param); ok {
+				if containsExecutionStatusReferences(ps) {
+					errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("pipeline tasks can not refer to execution status of any other pipeline task"+
+						" or aggregate status of tasks"), "value").ViaFieldKey("matrix", param.Name).ViaFieldIndex("tasks", idx))
 				}
 			}
 		}
 		for i, we := range t.WhenExpressions {
 			// retrieve a list of substitution expression from a when expression
 			if expressions, ok := we.GetVarSubstitutionExpressions(); ok {
-				// validate tasks.pipelineTask.status/tasks.status if this expression is not a result reference
-				if !LooksLikeContainsResultRefs(expressions) {
-					for _, e := range expressions {
-						// check if it contains context variable accessing execution status - $(tasks.taskname.status)
-						// or an aggregate status - $(tasks.status)
-						if containsExecutionStatusRef(e) {
-							errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("when expressions in pipeline tasks can not refer to execution status of any other pipeline task"+
-								" or aggregate status of tasks"), "").ViaFieldIndex("when", i).ViaFieldIndex("tasks", idx))
-						}
-					}
+				if containsExecutionStatusReferences(expressions) {
+					errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("when expressions in pipeline tasks can not refer to execution status of any other pipeline task"+
+						" or aggregate status of tasks"), "").ViaFieldIndex("when", i).ViaFieldIndex("tasks", idx))
 				}
 			}
 		}
 	}
 	return errs
+}
+
+func containsExecutionStatusReferences(expressions []string) bool {
+	// validate tasks.pipelineTask.status/tasks.status if this expression is not a result reference
+	if !LooksLikeContainsResultRefs(expressions) {
+		for _, e := range expressions {
+			// check if it contains context variable accessing execution status - $(tasks.taskname.status)
+			// or an aggregate status - $(tasks.status)
+			if containsExecutionStatusRef(e) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // validate finally tasks accessing execution status of a dag task specified in the pipeline
@@ -249,6 +265,12 @@ func validateExecutionStatusVariablesInFinally(tasks []PipelineTask, finally []P
 			if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
 				errs = errs.Also(validateExecutionStatusVariablesExpressions(expressions, ptNames, "value").ViaFieldKey(
 					"params", param.Name).ViaFieldIndex("finally", idx))
+			}
+		}
+		for _, param := range t.Matrix {
+			if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
+				errs = errs.Also(validateExecutionStatusVariablesExpressions(expressions, ptNames, "value").ViaFieldKey(
+					"matrix", param.Name).ViaFieldIndex("finally", idx))
 			}
 		}
 		for i, we := range t.WhenExpressions {
@@ -296,12 +318,11 @@ func validatePipelineContextVariablesInParamValues(paramValues []string, prefix 
 	return errs
 }
 
-// validateParamResults ensures that task result variables are properly configured
-func validateParamResults(tasks []PipelineTask) (errs *apis.FieldError) {
+// validateResultsInParameters ensures that task result variables are properly configured
+func validateResultsInParameters(tasks []PipelineTask) (errs *apis.FieldError) {
 	for idx, task := range tasks {
 		for _, param := range task.Params {
-			expressions, ok := GetVarSubstitutionExpressionsForParam(param)
-			if ok {
+			if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
 				if LooksLikeContainsResultRefs(expressions) {
 					expressions = filter(expressions, looksLikeResultRef)
 					resultRefs := NewResultRefs(expressions)
@@ -309,6 +330,15 @@ func validateParamResults(tasks []PipelineTask) (errs *apis.FieldError) {
 						errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("expected all of the expressions %v to be result expressions but only %v were", expressions, resultRefs),
 							"value").ViaFieldKey("params", param.Name).ViaFieldIndex("tasks", idx))
 					}
+				}
+			}
+		}
+		//TODO(jerop) TEP-0090: to be supported in future milestones
+		for _, param := range task.Matrix {
+			if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
+				if LooksLikeContainsResultRefs(expressions) {
+					errs = errs.Also(apis.ErrInvalidValue("results are not allowed in matrix parameter values",
+						"value").ViaFieldKey("matrix", param.Name).ViaFieldIndex("tasks", idx))
 				}
 			}
 		}
@@ -377,6 +407,15 @@ func validateTaskResultReferenceInFinallyTasks(finalTasks []PipelineTask, ts set
 			if expressions, ok := GetVarSubstitutionExpressionsForParam(p); ok {
 				errs = errs.Also(validateResultsVariablesExpressionsInFinally(expressions, ts, fts, "value").ViaFieldKey(
 					"params", p.Name).ViaFieldIndex("finally", idx))
+			}
+		}
+		//TODO(jerop) TEP-0090: to be supported in future milestones
+		for _, p := range t.Matrix {
+			if expressions, ok := GetVarSubstitutionExpressionsForParam(p); ok {
+				if LooksLikeContainsResultRefs(expressions) {
+					errs = errs.Also(apis.ErrInvalidValue("results are not allowed in matrix parameter values",
+						"value").ViaFieldKey("matrix", p.Name).ViaFieldIndex("finally", idx))
+				}
 			}
 		}
 		for i, we := range t.WhenExpressions {
@@ -545,4 +584,16 @@ func validateGraph(tasks []PipelineTask) *apis.FieldError {
 		return apis.ErrInvalidValue(err.Error(), "tasks")
 	}
 	return nil
+}
+
+func validateMatrix(ctx context.Context, tasks []PipelineTask) (errs *apis.FieldError) {
+	for idx, task := range tasks {
+		if len(task.Matrix) != 0 {
+			// This is an alpha feature and will fail validation if it's used in a pipelinerun spec
+			// when the enable-api-fields feature gate is anything but "alpha".
+			//TODO(jerop) TEP-0090: to be supported in future milestones
+			errs = errs.Also(ValidateEnabledAPIFields(ctx, "matrix", config.AlphaAPIFields).ViaIndex(idx))
+		}
+	}
+	return errs
 }

@@ -17,6 +17,9 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
+	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/pipeline/test/diff"
 	"strings"
 	"testing"
 
@@ -241,6 +244,43 @@ func TestValidatePipelineTaskResults_MissingTaskSpec(t *testing.T) {
 	err := ValidatePipelineTaskResults(state)
 	if err == nil || !strings.Contains(err.Error(), `task spec not found`) {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidatePipelineTaskResults_UsingMatrix(t *testing.T) {
+	for _, tc := range []struct {
+		desc          string
+		state         PipelineRunState
+		expectedError error
+	}{{
+		desc: "matrixed pipeline task produces a result",
+		state: PipelineRunState{{
+			PipelineTask: &v1beta1.PipelineTask{
+				Name: "pt1",
+				Matrix: []v1beta1.Param{{
+					Name: "a-param", Value: v1beta1.ArrayOrString{ArrayVal: []string{"a-value", "and", "b-value"}},
+				}},
+			},
+			ResolvedTaskResources: &resources.ResolvedTaskResources{
+				TaskName: "t",
+				TaskSpec: &v1beta1.TaskSpec{
+					Results: []v1beta1.TaskResult{{
+						Name: "result",
+					}},
+				},
+			},
+		}},
+		expectedError: fmt.Errorf("pipeline task with a matrix %q should not produce results", "pt1"),
+	}} {
+		t.Run(tc.desc, func(t *testing.T) {
+			err := ValidatePipelineTaskResults(tc.state)
+			if err == nil {
+				t.Errorf("ValidatePipelineTaskResults(tc.state) did not return error for invalid pipelineRunState")
+			}
+			if d := cmp.Diff(tc.expectedError.Error(), err.Error()); d != "" {
+				t.Errorf("PipelineSpec.Validate() errors diff %s", diff.PrintWantGot(d))
+			}
+		})
 	}
 }
 

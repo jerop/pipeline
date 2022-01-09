@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/tektoncd/pipeline/pkg/matrix"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -471,7 +472,7 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 
 	for _, rprt := range pipelineRunFacts.State {
 		if !rprt.IsCustomTask() {
-			err := taskrun.ValidateResolvedTaskResources(ctx, rprt.PipelineTask.Params, rprt.ResolvedTaskResources)
+			err := taskrun.ValidateResolvedTaskResources(ctx, rprt.PipelineTask.Params, rprt.PipelineTask.Matrix, rprt.ResolvedTaskResources)
 			if err != nil {
 				logger.Errorf("Failed to validate pipelinerun %q with error %v", pr.Name, err)
 				pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
@@ -644,6 +645,12 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 			resources.ApplyTaskResults(resources.PipelineRunState{rprt}, resolvedResultRefs)
 			nextRprts = append(nextRprts, rprt)
 		}
+	}
+
+	if fannedOutRprts, matricesPermutations := matrix.FanOut(nextRprts); len(matricesPermutations) > 0 {
+		nextRprts = fannedOutRprts
+		pr.Status.MatricesPermutations = append(pr.Status.MatricesPermutations, matricesPermutations...)
+		matrix.UpdateState(fannedOutRprts, pipelineRunFacts)
 	}
 
 	for _, rprt := range nextRprts {

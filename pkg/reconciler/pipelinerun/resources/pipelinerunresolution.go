@@ -684,3 +684,7 @@ func (t *ResolvedPipelineRunTask) hasResultReferences() bool {
 	}
 	return false
 }
+
+func (t *ResolvedPipelineRunTask) IsMatrixed() bool {
+	return len(t.PipelineTask.Matrix) != 0
+}

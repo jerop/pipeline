@@ -3,6 +3,7 @@ module github.com/tektoncd/pipeline
 go 1.16
 
 require (
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.5.0
 	github.com/containerd/containerd v1.5.9
 	github.com/ghodss/yaml v1.0.0
@@ -13,6 +14,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jenkins-x/go-scm v1.10.10
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198
 	github.com/pkg/errors v0.9.1

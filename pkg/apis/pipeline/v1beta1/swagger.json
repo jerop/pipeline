@@ -597,6 +597,38 @@
         }
       }
     },
+    "v1beta1.MatrixPermutation": {
+      "type": "object",
+      "properties": {
+        "params": {
+          "description": "A specific permutation of Parameters in a Matrix",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1beta1.Param"
+          }
+        },
+        "permutationId": {
+          "description": "Identification of a permutation from the Parameters in a Matrix",
+          "type": "string"
+        }
+      }
+    },
+    "v1beta1.MatrixPermutations": {
+      "type": "object",
+      "properties": {
+        "pipelineTaskName": {
+          "description": "PipelineTaskName is the name of the PipelineTask.",
+          "type": "string"
+        },
+        "pipelineTaskPermutations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1beta1.MatrixPermutation"
+          }
+        }
+      }
+    },
     "v1beta1.Param": {
       "description": "Param declares an ArrayOrString to use for the parameter called name.",
       "type": "object",
@@ -1036,6 +1068,12 @@
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },
+        "matricesPermutations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1beta1.MatrixPermutations"
+          }
+        },
         "observedGeneration": {
           "description": "ObservedGeneration is the 'Generation' of the Service that was last processed by the controller.",
           "type": "integer",
@@ -1088,6 +1126,12 @@
         "completionTime": {
           "description": "CompletionTime is the time the PipelineRun completed.",
           "$ref": "#/definitions/v1.Time"
+        },
+        "matricesPermutations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1beta1.MatrixPermutations"
+          }
         },
         "pipelineResults": {
           "description": "PipelineResults are the list of results written out by the pipeline task's containers",
@@ -1226,6 +1270,14 @@
           "items": {
             "default": {},
             "$ref": "#/definitions/v1beta1.PipelineTaskCondition"
+          }
+        },
+        "matrix": {
+          "description": "Matrix declares parameters used to fan out this task.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1beta1.Param"
           }
         },
         "name": {

@@ -426,6 +426,10 @@ type PipelineRunStatusFields struct {
 	// list of tasks that were skipped due to when expressions evaluating to false
 	// +optional
 	SkippedTasks []SkippedTask `json:"skippedTasks,omitempty"`
+
+	// list of matrices permutations generated from the matrix in pipeline tasks
+	// +optional
+	MatricesPermutations []*MatrixPermutations `json:"matricesPermutations,omitempty"`
 }
 
 // SkippedTask is used to describe the Tasks that were skipped due to their When Expressions
@@ -537,4 +541,22 @@ func (pr *PipelineRun) GetTaskRunSpec(pipelineTaskName string) PipelineTaskRunSp
 		}
 	}
 	return s
+}
+
+type MatrixPermutation struct {
+	// Identification of a permutation from the Parameters in a Matrix
+	// +optional
+	PermutationId string `json:"permutationId,omitempty"`
+
+	// A specific permutation of Parameters in a Matrix
+	// +optional
+	Params []Param `json:"params,omitempty"`
+}
+
+type MatrixPermutations struct {
+	// PipelineTaskName is the name of the PipelineTask.
+	PipelineTaskName string `json:"pipelineTaskName,omitempty"`
+
+	//TODO(jerop)
+	Permutations []*MatrixPermutation `json:"pipelineTaskPermutations,omitempty"`
 }

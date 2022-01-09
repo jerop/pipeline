@@ -168,6 +168,41 @@ func validatePipelineParametersVariablesInTaskParameters(params []Param, prefix 
 	return errs
 }
 
+func validatePipelineParametersVariablesInTaskMatrix(matrix []Param, params []Param, prefix string, paramNames sets.String, arrayParamNames sets.String) (errs *apis.FieldError) {
+	matrixParameterNames := sets.NewString()
+	for _, param := range matrix {
+
+		// validate there are array parameters only in the matrix
+		if param.Value.Type != ParamTypeArray {
+			errs = errs.Also(apis.ErrInvalidValue("parameters of type array only are allowed in matrix", "").ViaFieldKey("matrix", param.Name))
+		}
+
+		// validate the array variable in the matrix
+		for idx, arrayElement := range param.Value.ArrayVal {
+			errs = errs.Also(validateArrayVariable(arrayElement, prefix, paramNames, arrayParamNames).ViaFieldIndex("value", idx).ViaFieldKey("matrix", param.Name))
+		}
+
+		// validate there are no result references in the matrix
+		expressions, ok := GetVarSubstitutionExpressionsForParam(param)
+		if ok {
+			if LooksLikeContainsResultRefs(expressions) {
+				return errs.Also(apis.ErrInvalidValue("result references are not allowed in matrix", "value").ViaFieldKey("matrix", param.Name))
+			}
+		}
+
+		matrixParameterNames.Insert(param.Name)
+	}
+
+	// validate that the array parameter is not also in use in params field
+	for _, param := range params {
+		if matrixParameterNames.Has(param.Name) {
+			errs = errs.Also(apis.ErrMultipleOneOf("matrix["+param.Name+"]", "params["+param.Name+"]"))
+		}
+	}
+
+	return errs
+}
+
 func validateStringVariable(value, prefix string, stringVars sets.String, arrayVars sets.String) *apis.FieldError {
 	errs := substitution.ValidateVariableP(value, prefix, stringVars)
 	return errs.Also(substitution.ValidateVariableProhibitedP(value, prefix, arrayVars))

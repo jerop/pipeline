@@ -188,9 +188,14 @@ type PipelineTask struct {
 	// outputs.
 	// +optional
 	Resources *PipelineTaskResources `json:"resources,omitempty"`
+
 	// Parameters declares parameters passed to this task.
 	// +optional
 	Params []Param `json:"params,omitempty"`
+
+	// Matrix declares parameters used to fan out this task.
+	// +optional
+	Matrix []Param `json:"matrix,omitempty"`
 
 	// Workspaces maps workspaces from the pipeline spec to the workspaces
 	// declared in the Task.
