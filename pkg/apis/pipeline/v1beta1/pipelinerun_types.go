@@ -419,6 +419,10 @@ type ChildStatusReference struct {
 	// +optional
 	// +listType=atomic
 	WhenExpressions []WhenExpression `json:"whenExpressions,omitempty"`
+
+	// MatrixId is the identification of the combination of Parameters generated from a Matrix
+	// +optional
+	MatrixId string `json:"matrixId,omitempty"`
 }
 
 // GetConditionChecks returns a map representation of this ChildStatusReference's ConditionChecks, in the same form
@@ -536,6 +540,8 @@ type PipelineRunTaskRunStatus struct {
 	// +optional
 	// +listType=atomic
 	WhenExpressions []WhenExpression `json:"whenExpressions,omitempty"`
+	// MatrixId TODO(jerop)
+	MatrixId string `json:"matrixId,omitempty"`
 }
 
 // PipelineRunRunStatus contains the name of the PipelineTask for this Run and the Run's Status

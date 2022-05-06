@@ -7472,6 +7472,87 @@ func verifyTaskRunStatusesWhenExpressions(t *testing.T, embeddedStatus string, p
 	}
 }
 
+func TestReconciler_PipelineTaskMatrix(t *testing.T) {
+	names.TestingSeed()
+
+	p := parse.MustParsePipeline(t, `
+metadata:
+  name: p
+  namespace: foo
+spec:
+  tasks:
+    - name: platforms-and-browsers
+      taskRef:
+        name: mytask
+      matrix:
+        - name: platform
+          value:
+            - linux
+            - mac
+            - windows
+        - name: browser
+          value:
+            - chrome
+            - safari
+            - firefox
+`)
+	pr := parse.MustParsePipelineRun(t, `
+metadata:
+  name: pr
+  namespace: foo
+spec:
+  serviceAccountName: test-sa 
+  pipelineRef:
+    name: p
+`)
+
+	task := parse.MustParseTask(t, `
+metadata:
+  name: mytask
+  namespace: foo
+spec:
+  params:
+    - name: platform
+    - name: browser
+  steps:
+    - name: echo
+      image: alpine
+      script: |
+        echo "$(params.platform) and $(params.browser)"
+`)
+
+	cms := []*corev1.ConfigMap{withEnabledAlphaAPIFields(newFeatureFlagsConfigMap())}
+
+	d := test.Data{
+		PipelineRuns: []*v1beta1.PipelineRun{pr},
+		Pipelines:    []*v1beta1.Pipeline{p},
+		Tasks:        []*v1beta1.Task{task},
+		ConfigMaps:   cms,
+	}
+	prt := newPipelineRunTest(d, t)
+	defer prt.Cancel()
+
+	_, clients := prt.reconcileRun("foo", "pr", []string{}, false)
+
+	// Check that the expected TaskRun was created
+	actual, err := clients.Pipeline.TektonV1beta1().TaskRuns("foo").List(prt.TestAssets.Ctx, metav1.ListOptions{
+		LabelSelector: "tekton.dev/pipelineRun=pr",
+		Limit:         1,
+	})
+
+	if err != nil {
+		t.Fatalf("Failure to list TaskRun's %s", err)
+	}
+	if len(actual.Items) != 9 {
+		t.Fatalf("Expected 9 TaskRuns got %d", len(actual.Items))
+	}
+	actualTaskRuns := actual.Items[0]
+
+	if d := cmp.Diff(pr.Status.TaskRuns, &actualTaskRuns, ignoreResourceVersion); d != "" {
+		t.Errorf("Diff %s", diff.PrintWantGot(d))
+	}
+}
+
 func filterChildRefsForKind(childRefs []v1beta1.ChildStatusReference, kind string) []v1beta1.ChildStatusReference {
 	var filtered []v1beta1.ChildStatusReference
 	for _, cr := range childRefs {

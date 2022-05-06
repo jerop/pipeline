@@ -79,6 +79,7 @@ type ResolvedPipelineRunTask struct {
 	ResolvedTaskResources *resources.ResolvedTaskResources
 	// ConditionChecks ~~TaskRuns but for evaling conditions
 	ResolvedConditionChecks TaskConditionCheckState // Could also be a TaskRun or maybe just a Pod?
+	MatrixId                string
 }
 
 // IsDone returns true only if the task is skipped, succeeded or failed

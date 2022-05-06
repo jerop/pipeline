@@ -153,6 +153,7 @@ func (state PipelineRunState) GetTaskRunsStatus(pr *v1beta1.PipelineRun) map[str
 			prtrs = &v1beta1.PipelineRunTaskRunStatus{
 				PipelineTaskName: rprt.PipelineTask.Name,
 				WhenExpressions:  rprt.PipelineTask.WhenExpressions,
+				MatrixId:         rprt.MatrixId,
 			}
 		}
 

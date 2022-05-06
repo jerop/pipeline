@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/tektoncd/pipeline/pkg/matrix"
+	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -45,7 +47,6 @@ import (
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipeline/dag"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/resources"
-	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun"
 	tresources "github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	"github.com/tektoncd/pipeline/pkg/remote"
@@ -488,6 +489,11 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 		tasks = append(tasks, pipelineSpec.Finally...)
 	}
 	pipelineRunState, err := c.resolvePipelineState(ctx, tasks, pipelineMeta, pr, providedResources)
+
+	//if fannedOutRprts, pipelineTaskCombinations := matrix.FanOut(pipelineRunState); len(pipelineTaskCombinations) != 0 {
+	//	pipelineRunState = matrix.UpdateState(fannedOutRprts, pipelineRunState)
+	//}
+
 	switch {
 	case errors.Is(err, remote.ErrorRequestInProgress):
 		message := fmt.Sprintf("PipelineRun %s/%s awaiting remote resource", pr.Namespace, pr.Name)
@@ -576,11 +582,11 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 		return controller.NewPermanentError(err)
 	}
 
-	if err := c.runNextSchedulableTask(ctx, pr, pipelineRunFacts, as); err != nil {
+	if err := c.runNextSchedulableTask(ctx, pr, pipelineRunFacts, pipelineSpec, as); err != nil {
 		return err
 	}
 
-	if err := c.processRunTimeouts(ctx, pr, pipelineRunState); err != nil {
+	if err := c.processRunTimeouts(ctx, pr, pipelineRunFacts.State); err != nil {
 		return err
 	}
 
@@ -650,7 +656,7 @@ func (c *Reconciler) processRunTimeouts(ctx context.Context, pr *v1beta1.Pipelin
 // runNextSchedulableTask gets the next schedulable Tasks from the dag based on the current
 // pipeline run state, and starts them
 // after all DAG tasks are done, it's responsible for scheduling final tasks and start executing them
-func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.PipelineRun, pipelineRunFacts *resources.PipelineRunFacts, as artifacts.ArtifactStorageInterface) error {
+func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.PipelineRun, pipelineRunFacts *resources.PipelineRunFacts, pipelineSpec *v1beta1.PipelineSpec, as artifacts.ArtifactStorageInterface) error {
 
 	logger := logging.FromContext(ctx)
 	recorder := controller.GetEventRecorder(ctx)
@@ -691,6 +697,12 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 			resources.ApplyTaskResults(resources.PipelineRunState{rprt}, resolvedResultRefs)
 			nextRprts = append(nextRprts, rprt)
 		}
+	}
+
+	if fannedOutRprts, fannedOutPipelineTasksMap := matrix.FanOut(nextRprts); len(fannedOutRprts) != len(nextRprts) {
+		nextRprts = fannedOutRprts
+		pipelineRunFacts.State = matrix.UpdateState(fannedOutRprts, pipelineRunFacts.State)
+		pipelineSpec.Tasks = matrix.UpdatePipelineTasksList(fannedOutPipelineTasksMap, pipelineSpec.Tasks)
 	}
 
 	for _, rprt := range nextRprts {
