@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tektoncd/pipeline/pkg/matrix"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	apisconfig "github.com/tektoncd/pipeline/pkg/apis/config"
@@ -708,11 +710,21 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 					recorder.Eventf(pr, corev1.EventTypeWarning, "RunCreationFailed", "Failed to create Run %q: %v", rprt.RunName, err)
 					return fmt.Errorf("error creating Run called %s for PipelineTask %s from PipelineRun %s: %w", rprt.RunName, rprt.PipelineTask.Name, pr.Name, err)
 				}
+			} else if rprt.IsMatrixed() {
+				if rprt.IsFinalTask(pipelineRunFacts) {
+					rprt.TaskRuns, err = c.createTaskRuns(ctx, rprt, pr, as.StorageBasePath(pr), getFinallyTaskRunTimeout)
+				} else {
+					rprt.TaskRuns, err = c.createTaskRuns(ctx, rprt, pr, as.StorageBasePath(pr), getTaskRunTimeout)
+				}
+				if err != nil {
+					recorder.Eventf(pr, corev1.EventTypeWarning, "TaskRunsCreationFailed", "Failed to create TaskRuns %q: %v", rprt.TaskRunNames, err)
+					return fmt.Errorf("error creating TaskRuns called %s for PipelineTask %s from PipelineRun %s: %w", rprt.TaskRunNames, rprt.PipelineTask.Name, pr.Name, err)
+				}
 			} else {
 				if rprt.IsFinalTask(pipelineRunFacts) {
-					rprt.TaskRun, err = c.createTaskRun(ctx, rprt, pr, as.StorageBasePath(pr), getFinallyTaskRunTimeout)
+					rprt.TaskRun, err = c.createTaskRun(ctx, rprt.TaskRunName, nil, rprt, pr, as.StorageBasePath(pr), getFinallyTaskRunTimeout)
 				} else {
-					rprt.TaskRun, err = c.createTaskRun(ctx, rprt, pr, as.StorageBasePath(pr), getTaskRunTimeout)
+					rprt.TaskRun, err = c.createTaskRun(ctx, rprt.TaskRunName, nil, rprt, pr, as.StorageBasePath(pr), getTaskRunTimeout)
 				}
 				if err != nil {
 					recorder.Eventf(pr, corev1.EventTypeWarning, "TaskRunCreationFailed", "Failed to create TaskRun %q: %v", rprt.TaskRunName, err)
@@ -770,10 +782,24 @@ func (c *Reconciler) updateRunsStatusDirectly(pr *v1beta1.PipelineRun) error {
 
 type getTimeoutFunc func(ctx context.Context, pr *v1beta1.PipelineRun, rprt *resources.ResolvedPipelineRunTask, c clock.PassiveClock) *metav1.Duration
 
-func (c *Reconciler) createTaskRun(ctx context.Context, rprt *resources.ResolvedPipelineRunTask, pr *v1beta1.PipelineRun, storageBasePath string, getTimeoutFunc getTimeoutFunc) (*v1beta1.TaskRun, error) {
+func (c *Reconciler) createTaskRuns(ctx context.Context, rprt *resources.ResolvedPipelineRunTask, pr *v1beta1.PipelineRun, storageBasePath string, getTimeoutFunc getTimeoutFunc) ([]*v1beta1.TaskRun, error) {
+	var taskRuns []*v1beta1.TaskRun
+	matrixCombinations := matrix.FanOut(rprt.PipelineTask.Matrix).ToMap()
+	for i, taskRunName := range rprt.TaskRunNames {
+		params := matrixCombinations[strconv.Itoa(i)]
+		taskRun, err := c.createTaskRun(ctx, taskRunName, params, rprt, pr, storageBasePath, getTimeoutFunc)
+		if err != nil {
+			return nil, err
+		}
+		taskRuns = append(taskRuns, taskRun)
+	}
+	return taskRuns, nil
+}
+
+func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, params []v1beta1.Param, rprt *resources.ResolvedPipelineRunTask, pr *v1beta1.PipelineRun, storageBasePath string, getTimeoutFunc getTimeoutFunc) (*v1beta1.TaskRun, error) {
 	logger := logging.FromContext(ctx)
 
-	tr, _ := c.taskRunLister.TaskRuns(pr.Namespace).Get(rprt.TaskRunName)
+	tr, _ := c.taskRunLister.TaskRuns(pr.Namespace).Get(taskRunName)
 	if tr != nil {
 		// Don't modify the lister cache's copy.
 		tr = tr.DeepCopy()
@@ -789,7 +815,7 @@ func (c *Reconciler) createTaskRun(ctx context.Context, rprt *resources.Resolved
 	taskRunSpec := pr.GetTaskRunSpec(rprt.PipelineTask.Name)
 	tr = &v1beta1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            rprt.TaskRunName,
+			Name:            taskRunName,
 			Namespace:       pr.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*kmeta.NewControllerRef(pr)},
 			Labels:          combineTaskRunAndTaskSpecLabels(pr, rprt.PipelineTask),
@@ -803,6 +829,10 @@ func (c *Reconciler) createTaskRun(ctx context.Context, rprt *resources.Resolved
 			StepOverrides:      taskRunSpec.StepOverrides,
 			SidecarOverrides:   taskRunSpec.SidecarOverrides,
 		}}
+
+	if len(params) != 0 {
+		tr.Spec.Params = params
+	}
 
 	if rprt.ResolvedTaskResources.TaskName != "" {
 		// We pass the entire, original task ref because it may contain additional references like a Bundle url.
@@ -823,7 +853,7 @@ func (c *Reconciler) createTaskRun(ctx context.Context, rprt *resources.Resolved
 	}
 
 	resources.WrapSteps(&tr.Spec, rprt.PipelineTask, rprt.ResolvedTaskResources.Inputs, rprt.ResolvedTaskResources.Outputs, storageBasePath)
-	logger.Infof("Creating a new TaskRun object %s for pipeline task %s", rprt.TaskRunName, rprt.PipelineTask.Name)
+	logger.Infof("Creating a new TaskRun object %s for pipeline task %s", taskRunName, rprt.PipelineTask.Name)
 	return c.PipelineClientSet.TektonV1beta1().TaskRuns(pr.Namespace).Create(ctx, tr, metav1.CreateOptions{})
 }
 

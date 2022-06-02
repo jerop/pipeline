@@ -142,11 +142,16 @@ func (state PipelineRunState) GetTaskRunsStatus(pr *v1beta1.PipelineRun) map[str
 		if rprt.IsCustomTask() {
 			continue
 		}
-		if rprt.TaskRun == nil && rprt.ResolvedConditionChecks == nil {
+		if rprt.TaskRun == nil && len(rprt.TaskRuns) == 0 && rprt.ResolvedConditionChecks == nil {
 			continue
 		}
-
-		status[rprt.TaskRunName] = rprt.getTaskRunStatus(rprt.TaskRunName, rprt.TaskRun, pr)
+		if rprt.IsMatrixed() {
+			for _, taskRun := range rprt.TaskRuns {
+				status[taskRun.Name] = rprt.getTaskRunStatus(taskRun.Name, taskRun, pr)
+			}
+		} else {
+			status[rprt.TaskRunName] = rprt.getTaskRunStatus(rprt.TaskRunName, rprt.TaskRun, pr)
+		}
 	}
 	return status
 }
@@ -199,6 +204,9 @@ func (state PipelineRunState) GetTaskRunsResults() map[string][]v1beta1.TaskRunR
 	results := make(map[string][]v1beta1.TaskRunResult)
 	for _, rprt := range state {
 		if rprt.IsCustomTask() {
+			continue
+		}
+		if rprt.IsMatrixed() {
 			continue
 		}
 		if !rprt.IsSuccessful() {
@@ -270,21 +278,29 @@ func (state PipelineRunState) GetChildReferences(taskRunVersion string, runVersi
 	for _, rprt := range state {
 		// If this is for a TaskRun, but there isn't yet a specified TaskRun and we haven't resolved condition checks yet,
 		// skip this entry.
-		if !rprt.CustomTask && rprt.TaskRun == nil && rprt.ResolvedConditionChecks == nil {
+		if !rprt.CustomTask && rprt.TaskRun == nil && len(rprt.TaskRuns) == 0 && rprt.ResolvedConditionChecks == nil {
 			continue
 		}
-		var childRef v1beta1.ChildStatusReference
-		if rprt.CustomTask {
-			childRef = rprt.getChildRefForRun(runVersion)
-		} else {
-			childRef = rprt.getChildRefForTaskRun(taskRunVersion)
+		//var childRef v1beta1.ChildStatusReference
+		switch {
+		case rprt.IsCustomTask() && rprt.IsMatrixed():
+			for _, runName := range rprt.RunNames {
+				childRefs = append(childRefs, rprt.getChildRefForRun(runVersion, runName))
+			}
+		case rprt.IsCustomTask():
+			childRefs = append(childRefs, rprt.getChildRefForRun(runVersion, rprt.RunName))
+		case rprt.IsMatrixed():
+			for _, taskRunName := range rprt.TaskRunNames {
+				childRefs = append(childRefs, rprt.getChildRefForTaskRun(taskRunVersion, taskRunName))
+			}
+		default:
+			childRefs = append(childRefs, rprt.getChildRefForTaskRun(taskRunVersion, rprt.TaskRunName))
 		}
-		childRefs = append(childRefs, childRef)
 	}
 	return childRefs
 }
 
-func (rprt *ResolvedPipelineRunTask) getChildRefForRun(runVersion string) v1beta1.ChildStatusReference {
+func (rprt *ResolvedPipelineRunTask) getChildRefForRun(runVersion string, runName string) v1beta1.ChildStatusReference {
 	if rprt.Run != nil {
 		runVersion = rprt.Run.APIVersion
 	}
@@ -294,13 +310,13 @@ func (rprt *ResolvedPipelineRunTask) getChildRefForRun(runVersion string) v1beta
 			APIVersion: runVersion,
 			Kind:       pipeline.RunControllerName,
 		},
-		Name:             rprt.RunName,
+		Name:             runName,
 		PipelineTaskName: rprt.PipelineTask.Name,
 		WhenExpressions:  rprt.PipelineTask.WhenExpressions,
 	}
 }
 
-func (rprt *ResolvedPipelineRunTask) getChildRefForTaskRun(taskRunVersion string) v1beta1.ChildStatusReference {
+func (rprt *ResolvedPipelineRunTask) getChildRefForTaskRun(taskRunVersion string, taskRunName string) v1beta1.ChildStatusReference {
 	if rprt.TaskRun != nil {
 		taskRunVersion = rprt.TaskRun.APIVersion
 	}
@@ -326,7 +342,7 @@ func (rprt *ResolvedPipelineRunTask) getChildRefForTaskRun(taskRunVersion string
 			APIVersion: taskRunVersion,
 			Kind:       pipeline.TaskRunControllerName,
 		},
-		Name:             rprt.TaskRunName,
+		Name:             taskRunName,
 		PipelineTaskName: rprt.PipelineTask.Name,
 		WhenExpressions:  rprt.PipelineTask.WhenExpressions,
 		ConditionChecks:  childConditions,
