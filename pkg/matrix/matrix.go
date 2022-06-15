@@ -25,3 +25,14 @@ func FanOut(params []v1beta1.Param) Combinations {
 	}
 	return combinations
 }
+
+func CountCombinations(params []v1beta1.Param) int {
+	if len(params) == 0 {
+		return 0
+	}
+	count := 1
+	for _, param := range params {
+		count *= len(param.Value.ArrayVal)
+	}
+	return count
+}

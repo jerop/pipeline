@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/test/diff"
 )
 
 func Test_FanOut(t *testing.T) {
@@ -147,6 +148,65 @@ func Test_FanOut(t *testing.T) {
 			gotCombinations := FanOut(tt.matrix)
 			if d := cmp.Diff(tt.wantCombinations, gotCombinations); d != "" {
 				t.Errorf("Combinations of Parameters did not match the expected Combinations: %s", d)
+			}
+		})
+	}
+}
+
+func TestPipelineTask_CountCombinations(t *testing.T) {
+	tests := []struct {
+		name                    string
+		matrix                  []v1beta1.Param
+		matrixCombinationsCount int
+	}{{
+		name:                    "combinations count is zero",
+		matrix:                  []v1beta1.Param{},
+		matrixCombinationsCount: 0,
+	}, {
+		name: "combinations count is one from one parameter",
+		matrix: []v1beta1.Param{{
+			Name: "foo", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"foo"}},
+		}},
+		matrixCombinationsCount: 1,
+	}, {
+		name: "combinations count is one from two parameters",
+		matrix: []v1beta1.Param{{
+			Name: "foo", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"foo"}},
+		}, {
+			Name: "bar", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"bar"}},
+		}},
+		matrixCombinationsCount: 1,
+	}, {
+		name: "combinations count is two from one parameter",
+		matrix: []v1beta1.Param{{
+			Name: "foo", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"foo", "bar"}},
+		}},
+		matrixCombinationsCount: 2,
+	}, {
+		name: "combinations count is nine",
+		matrix: []v1beta1.Param{{
+			Name: "foo", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"f", "o", "o"}},
+		}, {
+			Name: "bar", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"b", "a", "r"}},
+		}},
+		matrixCombinationsCount: 9,
+	}, {
+		name: "combinations count is large",
+		matrix: []v1beta1.Param{{
+			Name: "foo", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"f", "o", "o"}},
+		}, {
+			Name: "bar", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"b", "a", "r"}},
+		}, {
+			Name: "quz", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"q", "u", "z"}},
+		}, {
+			Name: "xyzzy", Value: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"x", "y", "z", "z", "y"}},
+		}},
+		matrixCombinationsCount: 135,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if d := cmp.Diff(tt.matrixCombinationsCount, CountCombinations(tt.matrix)); d != "" {
+				t.Errorf("CountCombinations() errors diff %s", diff.PrintWantGot(d))
 			}
 		})
 	}
