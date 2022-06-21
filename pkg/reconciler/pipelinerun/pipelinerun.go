@@ -584,12 +584,15 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 	after = pr.Status.GetCondition(apis.ConditionSucceeded)
 	pr.Status.StartTime = pipelineRunFacts.State.AdjustStartTime(pr.Status.StartTime)
 
-	if cfg.FeatureFlags.EmbeddedStatus == config.FullEmbeddedStatus || cfg.FeatureFlags.EmbeddedStatus == config.BothEmbeddedStatus {
+	fullEmbeddedStatus := cfg.FeatureFlags.EmbeddedStatus == config.FullEmbeddedStatus || cfg.FeatureFlags.EmbeddedStatus == config.BothEmbeddedStatus
+	minimalEmbeddedStatus := cfg.FeatureFlags.EmbeddedStatus == config.MinimalEmbeddedStatus || cfg.FeatureFlags.EmbeddedStatus == config.BothEmbeddedStatus
+
+	if fullEmbeddedStatus {
 		pr.Status.TaskRuns = pipelineRunFacts.State.GetTaskRunsStatus(pr)
 		pr.Status.Runs = pipelineRunFacts.State.GetRunsStatus(pr)
 	}
 
-	if cfg.FeatureFlags.EmbeddedStatus == config.MinimalEmbeddedStatus || cfg.FeatureFlags.EmbeddedStatus == config.BothEmbeddedStatus {
+	if minimalEmbeddedStatus {
 		pr.Status.ChildReferences = pipelineRunFacts.State.GetChildReferences()
 	}
 

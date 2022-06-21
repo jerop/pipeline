@@ -176,13 +176,16 @@ func (rprt *ResolvedPipelineRunTask) getTaskRunStatus(tr *v1beta1.TaskRun, pr *v
 func (state PipelineRunState) GetTaskRunsResults() map[string][]v1beta1.TaskRunResult {
 	results := make(map[string][]v1beta1.TaskRunResult)
 	for _, rprt := range state {
-		if rprt.IsCustomTask() {
+		switch {
+		case rprt.IsCustomTask() || !rprt.isSuccessful():
 			continue
+		case rprt.IsMatrixed():
+			for _, taskRun := range rprt.TaskRuns {
+				results[rprt.PipelineTask.Name] = taskRun.Status.TaskRunResults
+			}
+		default:
+			results[rprt.PipelineTask.Name] = rprt.TaskRun.Status.TaskRunResults
 		}
-		if !rprt.isSuccessful() {
-			continue
-		}
-		results[rprt.PipelineTask.Name] = rprt.TaskRun.Status.TaskRunResults
 	}
 
 	return results
@@ -249,7 +252,9 @@ func (state PipelineRunState) GetChildReferences() []v1beta1.ChildStatusReferenc
 			childRefs = append(childRefs, rprt.getChildRefForTaskRun(rprt.TaskRun))
 		case len(rprt.TaskRuns) != 0:
 			for _, taskRun := range rprt.TaskRuns {
-				childRefs = append(childRefs, rprt.getChildRefForTaskRun(taskRun))
+				if taskRun != nil {
+					childRefs = append(childRefs, rprt.getChildRefForTaskRun(taskRun))
+				}
 			}
 		}
 	}
