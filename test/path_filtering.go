@@ -46,7 +46,7 @@ func getPathFilter(t *testing.T) (pathFilter, error) {
 	if ns == "" {
 		ns = defaultSystemNamespace
 	}
-	enabledFeatureGate, err := getFeatureGate(ns)
+	enabledFeatureGate, embeddedStatus, err := getFeatureGates(ns)
 	if err != nil {
 		return nil, fmt.Errorf("error reading enabled feature gate: %v", err)
 	}
@@ -55,12 +55,17 @@ func getPathFilter(t *testing.T) (pathFilter, error) {
 	case "stable":
 		f = stablePathFilter
 	case "alpha":
-		f = alphaPathFilter
+		switch embeddedStatus {
+		case "minimal":
+			f = alphaMinimalPathFilter
+		default:
+			f = alphaPathFilter
+		}
 	}
 	if f == nil {
 		return nil, fmt.Errorf("unable to create path filter from feature gate %q", enabledFeatureGate)
 	}
-	t.Logf("Allowing only %q examples", enabledFeatureGate)
+	t.Logf("Allowing only %q examples with %q status enabled", enabledFeatureGate, embeddedStatus)
 	return f, nil
 }
 
@@ -68,14 +73,16 @@ func getPathFilter(t *testing.T) (pathFilter, error) {
 // need to repeatedly query the feature flag configmap
 var enableAPIFields = ""
 
-// getFeatureGate queries the tekton pipelines namespace for the
+var embeddedStatus = ""
+
+// getFeatureGates queries the tekton pipelines namespace for the
 // current value of the "enable-api-fields" feature gate.
-func getFeatureGate(namespace string) (string, error) {
+func getFeatureGates(namespace string) (string, string, error) {
 	if enableAPIFields == "" {
 		cmd := exec.Command("kubectl", "get", "configmap", "feature-flags", "-n", namespace, "-o", `jsonpath="{.data['enable-api-fields']}"`)
 		output, err := cmd.Output()
 		if err != nil {
-			return "", fmt.Errorf("error getting feature-flags configmap: %v", err)
+			return "", "", fmt.Errorf("error getting feature-flags configmap: %v", err)
 		}
 		output = bytes.TrimSpace(output)
 		output = bytes.Trim(output, "\"")
@@ -84,7 +91,20 @@ func getFeatureGate(namespace string) (string, error) {
 		}
 		enableAPIFields = string(output)
 	}
-	return enableAPIFields, nil
+	if embeddedStatus == "" {
+		cmd := exec.Command("kubectl", "get", "configmap", "feature-flags", "-n", namespace, "-o", `jsonpath="{.data['embedded-status']}"`)
+		output, err := cmd.Output()
+		if err != nil {
+			return "", "", fmt.Errorf("error getting feature-flags configmap: %v", err)
+		}
+		output = bytes.TrimSpace(output)
+		output = bytes.Trim(output, "\"")
+		if len(output) == 0 {
+			output = []byte("full")
+		}
+		embeddedStatus = string(output)
+	}
+	return enableAPIFields, embeddedStatus, nil
 }
 
 // stablePathFilter returns true for any example that should be allowed to run
@@ -97,4 +117,10 @@ func stablePathFilter(p string) bool {
 // when "enable-api-fields" is "alpha".
 func alphaPathFilter(p string) bool {
 	return strings.Contains(p, "/alpha/") || strings.Contains(p, "/beta/") || stablePathFilter(p)
+}
+
+// alphaPathFilter returns true for any example that should be allowed to run
+// when "enable-api-fields" is "alpha".
+func alphaMinimalPathFilter(p string) bool {
+	return strings.Contains(p, "/minimal/") || alphaPathFilter(p)
 }
