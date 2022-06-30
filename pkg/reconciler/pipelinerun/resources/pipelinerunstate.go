@@ -298,7 +298,7 @@ func (state PipelineRunState) getNextTasks(candidateTasks sets.String) []*Resolv
 	tasks := []*ResolvedPipelineTask{}
 	for _, t := range state {
 		if _, ok := candidateTasks[t.PipelineTask.Name]; ok {
-			if t.TaskRun == nil && t.Run == nil {
+			if t.TaskRun == nil && t.Run == nil && len(t.TaskRuns) == 0 && len(t.Runs) == 0 {
 				tasks = append(tasks, t)
 			}
 		}
@@ -315,19 +315,43 @@ func (state PipelineRunState) getRetryableTasks(candidateTasks sets.String) []*R
 		if _, ok := candidateTasks[t.PipelineTask.Name]; ok {
 			var status *apis.Condition
 			var isCancelled bool
-			if t.TaskRun != nil {
+			switch {
+			case t.TaskRun != nil:
 				status = t.TaskRun.Status.GetCondition(apis.ConditionSucceeded)
 				isCancelled = t.TaskRun.IsCancelled()
 				if status != nil {
 					isCancelled = isCancelled || status.Reason == v1beta1.TaskRunReasonCancelled.String()
 				}
-
-			} else if t.Run != nil {
+			case len(t.TaskRuns) != 0:
+				isDone := true
+				isCancelled = false
+				for _, taskRun := range t.TaskRuns {
+					isDone = isDone && taskRun.IsDone()
+					c := taskRun.Status.GetCondition(apis.ConditionSucceeded)
+					if c.IsFalse() {
+						status = c
+						isCancelled = isCancelled || c.Reason == v1beta1.TaskRunReasonCancelled.String()
+					}
+				}
+				isCancelled = isCancelled && isDone
+			case t.Run != nil:
 				status = t.Run.Status.GetCondition(apis.ConditionSucceeded)
 				isCancelled = t.Run.IsCancelled()
 				if status != nil {
 					isCancelled = isCancelled || status.Reason == v1alpha1.RunReasonCancelled
 				}
+			case len(t.Runs) != 0:
+				isDone := true
+				isCancelled = false
+				for _, run := range t.Runs {
+					isDone = isDone && run.IsDone()
+					c := run.Status.GetCondition(apis.ConditionSucceeded)
+					if c.IsFalse() {
+						status = c
+						isCancelled = isCancelled || c.Reason == v1alpha1.RunReasonCancelled
+					}
+				}
+				isCancelled = isCancelled && isDone
 			}
 			if status.IsFalse() && !isCancelled && t.hasRemainingRetries() {
 				tasks = append(tasks, t)
