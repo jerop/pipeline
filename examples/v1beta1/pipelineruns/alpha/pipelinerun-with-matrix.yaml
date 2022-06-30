@@ -49,3 +49,30 @@ spec:
             value: chrome
         taskRef:
           name: platform-browsers
+    finally:
+      - name: platforms-and-browsers-finally
+        matrix:
+          - name: platform
+            value:
+              - linux
+              - mac
+              - windows
+          - name: browser
+            value:
+              - chrome
+              - safari
+              - firefox
+        taskRef:
+          name: platform-browsers
+      - name: matrix-and-params-finally
+        matrix:
+          - name: platform
+            value:
+              - linux
+              - mac
+              - windows
+        params:
+          - name: browser
+            value: chrome
+        taskRef:
+          name: platform-browsers

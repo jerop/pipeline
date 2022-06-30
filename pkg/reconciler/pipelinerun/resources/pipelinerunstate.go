@@ -98,9 +98,7 @@ func (state PipelineRunState) ToMap() map[string]*ResolvedPipelineTask {
 // IsBeforeFirstTaskRun returns true if the PipelineRun has not yet started its first TaskRun
 func (state PipelineRunState) IsBeforeFirstTaskRun() bool {
 	for _, t := range state {
-		if t.IsCustomTask() && t.Run != nil {
-			return false
-		} else if t.TaskRun != nil {
+		if len(t.Runs) != 0 || t.Run != nil || len(t.TaskRuns) != 0 || t.TaskRun != nil {
 			return false
 		}
 	}
@@ -549,7 +547,7 @@ func (facts *PipelineRunFacts) GetPipelineTaskStatus() map[string]string {
 			case t.isSuccessful():
 				s = v1beta1.TaskRunReasonSuccessful.String()
 			// execution status is Failed when a task has succeeded condition with status set to false
-			case t.isConditionStatusFalse():
+			case t.isFailure():
 				s = v1beta1.TaskRunReasonFailed.String()
 			default:
 				// None includes skipped as well
@@ -567,7 +565,7 @@ func (facts *PipelineRunFacts) GetPipelineTaskStatus() map[string]string {
 		for _, t := range facts.State {
 			if facts.isDAGTask(t.PipelineTask.Name) {
 				// if any of the dag task failed, change the aggregate status to failed and return
-				if t.isConditionStatusFalse() {
+				if t.isFailure() {
 					aggregateStatus = v1beta1.PipelineRunReasonFailed.String()
 					break
 				}

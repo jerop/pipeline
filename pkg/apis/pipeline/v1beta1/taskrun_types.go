@@ -406,7 +406,7 @@ func (tr *TaskRun) HasPipelineRunOwnerReference() bool {
 
 // IsDone returns true if the TaskRun's status indicates that it is done.
 func (tr *TaskRun) IsDone() bool {
-	return !tr.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
+	return tr != nil && !tr.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
 }
 
 // HasStarted function check whether taskrun has valid start time set in its status
@@ -421,7 +421,7 @@ func (tr *TaskRun) IsSuccessful() bool {
 
 // IsCancelled returns true if the TaskRun's spec status is set to Cancelled state
 func (tr *TaskRun) IsCancelled() bool {
-	return tr.Spec.Status == TaskRunSpecStatusCancelled
+	return tr != nil && tr.Spec.Status == TaskRunSpecStatusCancelled
 }
 
 // HasTimedOut returns true if the TaskRun runtime is beyond the allowed timeout

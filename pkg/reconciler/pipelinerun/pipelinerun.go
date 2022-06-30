@@ -776,6 +776,9 @@ func (c *Reconciler) createTaskRuns(ctx context.Context, rpt *resources.Resolved
 	var taskRuns []*v1beta1.TaskRun
 	matrixCombinations := matrix.FanOut(rpt.PipelineTask.Matrix).ToMap()
 	for i, taskRunName := range rpt.TaskRunNames {
+		if tr, _ := c.taskRunLister.TaskRuns(pr.Namespace).Get(taskRunName); tr != nil {
+			continue
+		}
 		params := matrixCombinations[strconv.Itoa(i)]
 		taskRun, err := c.createTaskRun(ctx, taskRunName, params, rpt, pr, storageBasePath, getTimeoutFunc)
 		if err != nil {
@@ -791,14 +794,18 @@ func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, para
 
 	tr, _ := c.taskRunLister.TaskRuns(pr.Namespace).Get(taskRunName)
 	if tr != nil {
-		// Don't modify the lister cache's copy.
-		tr = tr.DeepCopy()
-		// is a retry
-		addRetryHistory(tr)
-		clearStatus(tr)
-		tr.Status.MarkResourceOngoing("", "")
-		logger.Infof("Updating taskrun %s with cleared status and retry history (length: %d).", tr.GetName(), len(tr.Status.RetriesStatus))
-		return c.PipelineClientSet.TektonV1beta1().TaskRuns(pr.Namespace).UpdateStatus(ctx, tr, metav1.UpdateOptions{})
+		if tr.Status.GetCondition(apis.ConditionSucceeded).IsFalse() {
+			// Don't modify the lister cache's copy.
+			tr = tr.DeepCopy()
+			// is a retry
+			addRetryHistory(tr)
+			clearStatus(tr)
+			tr.Status.MarkResourceOngoing("", "")
+			logger.Infof("Updating taskrun %s with cleared status and retry history (length: %d).", tr.GetName(), len(tr.Status.RetriesStatus))
+			return c.PipelineClientSet.TektonV1beta1().TaskRuns(pr.Namespace).UpdateStatus(ctx, tr, metav1.UpdateOptions{})
+		} else {
+			return tr, nil
+		}
 	}
 
 	rpt.PipelineTask = resources.ApplyPipelineTaskContexts(rpt.PipelineTask)

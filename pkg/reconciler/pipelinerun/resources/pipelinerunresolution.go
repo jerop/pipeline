@@ -158,6 +158,9 @@ func (t ResolvedPipelineTask) isFailure() bool {
 		isDone = true
 		atLeastOneFailed := false
 		for _, run := range t.Runs {
+			if run == nil {
+				return false
+			}
 			isDone = isDone && run.IsDone()
 			runFailed := run.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.hasRemainingRetries()
 			atLeastOneFailed = atLeastOneFailed || runFailed
@@ -176,6 +179,9 @@ func (t ResolvedPipelineTask) isFailure() bool {
 		isDone = true
 		atLeastOneFailed := false
 		for _, taskRun := range t.TaskRuns {
+			if taskRun == nil {
+				return false
+			}
 			isDone = isDone && taskRun.IsDone()
 			taskRunFailed := taskRun.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.hasRemainingRetries()
 			atLeastOneFailed = atLeastOneFailed || taskRunFailed
@@ -245,6 +251,9 @@ func (t ResolvedPipelineTask) isCancelled() bool {
 		isDone := true
 		atLeastOneCancelled := false
 		for _, run := range t.Runs {
+			if run == nil {
+				return false
+			}
 			isDone = isDone && run.IsDone()
 			c := run.Status.GetCondition(apis.ConditionSucceeded)
 			runCancelled := c.IsFalse() && c.Reason == v1alpha1.RunReasonCancelled
@@ -264,6 +273,9 @@ func (t ResolvedPipelineTask) isCancelled() bool {
 		isDone := true
 		atLeastOneCancelled := false
 		for _, taskRun := range t.TaskRuns {
+			if taskRun == nil {
+				return false
+			}
 			isDone = isDone && taskRun.IsDone()
 			c := taskRun.Status.GetCondition(apis.ConditionSucceeded)
 			taskRunCancelled := c.IsFalse() && c.Reason == v1beta1.TaskRunReasonCancelled.String()
@@ -291,11 +303,26 @@ func (t ResolvedPipelineTask) isScheduled() bool {
 // isStarted returns true only if the PipelineRunTask itself has a TaskRun or
 // Run associated that has a Succeeded-type condition.
 func (t ResolvedPipelineTask) isStarted() bool {
-	if t.IsCustomTask() {
+	switch {
+	case t.IsCustomTask() && t.IsMatrixed():
+		for _, run := range t.Runs {
+			if run != nil && run.Status.GetCondition(apis.ConditionSucceeded) != nil {
+				return true
+			}
+		}
+		return false
+	case t.IsCustomTask():
 		return t.Run != nil && t.Run.Status.GetCondition(apis.ConditionSucceeded) != nil
-
+	case t.IsMatrixed():
+		for _, taskRun := range t.TaskRuns {
+			if taskRun != nil && taskRun.Status.GetCondition(apis.ConditionSucceeded) != nil {
+				return true
+			}
+		}
+		return false
+	default:
+		return t.TaskRun != nil && t.TaskRun.Status.GetCondition(apis.ConditionSucceeded) != nil
 	}
-	return t.TaskRun != nil && t.TaskRun.Status.GetCondition(apis.ConditionSucceeded) != nil
 }
 
 // isConditionStatusFalse returns true when a task has succeeded condition with status set to false
