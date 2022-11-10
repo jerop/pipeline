@@ -323,11 +323,11 @@ func withRunCancelledBySpec(run *v1alpha1.Run) *v1alpha1.Run {
 
 func makeRetried(tr v1beta1.TaskRun) (newTr *v1beta1.TaskRun) {
 	newTr = newTaskRun(tr)
-	newTr = withRetries(newTr)
+	newTr = withRetriesStatus(newTr)
 	return
 }
 
-func withRetries(tr *v1beta1.TaskRun) *v1beta1.TaskRun {
+func withRetriesStatus(tr *v1beta1.TaskRun) *v1beta1.TaskRun {
 	tr.Status.RetriesStatus = []v1beta1.TaskRunStatus{{
 		Status: duckv1beta1.Status{
 			Conditions: []apis.Condition{{
@@ -336,6 +336,16 @@ func withRetries(tr *v1beta1.TaskRun) *v1beta1.TaskRun {
 			}},
 		},
 	}}
+	return tr
+}
+
+func withRetryable(tr *v1beta1.TaskRun, retries int) *v1beta1.TaskRun {
+	tr.Status.MarkResourceRetryable(retries)
+	return tr
+}
+
+func withUnRetryable(tr *v1beta1.TaskRun, retries int) *v1beta1.TaskRun {
+	tr.Status.MarkResourceUnRetryable(retries)
 	return tr
 }
 
@@ -1314,7 +1324,7 @@ func TestIsFailure(t *testing.T) {
 		name: "taskrun failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withRetries(makeFailed(trs[0])),
+			TaskRun:      withUnRetryable(withRetriesStatus(makeFailed(trs[0])), 1),
 		},
 		want: true,
 	}, {
@@ -1390,7 +1400,7 @@ func TestIsFailure(t *testing.T) {
 		name: "taskrun cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withCancelled(withRetries(makeFailed(trs[0]))),
+			TaskRun:      withCancelled(withRetriesStatus(makeFailed(trs[0]))),
 		},
 		want: true,
 	}, {
@@ -1515,7 +1525,7 @@ func TestIsFailure(t *testing.T) {
 		name: "matrixed taskruns failed: one taskrun with retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetriesStatus(makeFailed(trs[1]))},
 		},
 		want: false,
 	}, {
@@ -1530,7 +1540,7 @@ func TestIsFailure(t *testing.T) {
 		name: "matrixed taskruns failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withRetries(makeFailed(trs[0])), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{withUnRetryable(withRetriesStatus(makeFailed(trs[0])), 1), withUnRetryable(withRetriesStatus(makeFailed(trs[1])), 1)},
 		},
 		want: true,
 	}, {
@@ -1635,7 +1645,7 @@ func TestIsFailure(t *testing.T) {
 		name: "matrixed taskruns cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), withCancelled(withRetries(makeFailed(trs[1])))},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), withCancelled(withRetriesStatus(makeFailed(trs[1])))},
 		},
 		want: true,
 	}, {
@@ -1650,7 +1660,7 @@ func TestIsFailure(t *testing.T) {
 		name: "one matrixed taskrun cancelled: no retries remaining, one matrixed taskrun running",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), makeStarted(trs[1])},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), makeStarted(trs[1])},
 		},
 		want: false,
 	}, {
@@ -3947,7 +3957,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "taskrun failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withRetries(makeFailed(trs[0])),
+			TaskRun:      withRetriesStatus(makeFailed(trs[0])),
 		},
 		want: false,
 	}, {
@@ -4008,7 +4018,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "taskrun cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withCancelled(withRetries(makeFailed(trs[0]))),
+			TaskRun:      withCancelled(withRetriesStatus(makeFailed(trs[0]))),
 		},
 		want: false,
 	}, {
@@ -4141,7 +4151,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "matrixed taskruns failed: one taskrun with retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetriesStatus(makeFailed(trs[1]))},
 		},
 		want: false,
 	}, {
@@ -4156,7 +4166,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "matrixed taskruns failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withRetries(makeFailed(trs[0])), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{withRetriesStatus(makeFailed(trs[0])), withRetriesStatus(makeFailed(trs[1]))},
 		},
 		want: false,
 	}, {
@@ -4261,7 +4271,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "matrixed taskruns cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), withCancelled(withRetries(makeFailed(trs[1])))},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), withCancelled(withRetriesStatus(makeFailed(trs[1])))},
 		},
 		want: false,
 	}, {
@@ -4276,7 +4286,7 @@ func TestIsSuccessful(t *testing.T) {
 		name: "one matrixed taskrun cancelled: no retries remaining, one matrixed taskrun running",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), makeStarted(trs[1])},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), makeStarted(trs[1])},
 		},
 		want: false,
 	}, {
@@ -4383,7 +4393,7 @@ func TestIsRunning(t *testing.T) {
 		name: "taskrun failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withRetries(makeFailed(trs[0])),
+			TaskRun:      withUnRetryable(withRetriesStatus(makeFailed(trs[0])), 1),
 		},
 		want: false,
 	}, {
@@ -4444,7 +4454,7 @@ func TestIsRunning(t *testing.T) {
 		name: "taskrun cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			TaskRun:      withCancelled(withRetries(makeFailed(trs[0]))),
+			TaskRun:      withCancelled(withRetriesStatus(makeFailed(trs[0]))),
 		},
 		want: false,
 	}, {
@@ -4562,7 +4572,7 @@ func TestIsRunning(t *testing.T) {
 		name: "matrixed taskruns failed: one taskrun with retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{makeFailed(trs[0]), withRetriesStatus(makeFailed(trs[1]))},
 		},
 		want: true,
 	}, {
@@ -4577,7 +4587,7 @@ func TestIsRunning(t *testing.T) {
 		name: "matrixed taskruns failed: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withRetries(makeFailed(trs[0])), withRetries(makeFailed(trs[1]))},
+			TaskRuns:     []*v1beta1.TaskRun{withUnRetryable(withRetriesStatus(makeFailed(trs[0])), 1), withUnRetryable(withRetriesStatus(makeFailed(trs[1])), 1)},
 		},
 		want: false,
 	}, {
@@ -4682,7 +4692,7 @@ func TestIsRunning(t *testing.T) {
 		name: "matrixed taskruns cancelled: no retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), withCancelled(withRetries(makeFailed(trs[1])))},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), withCancelled(withRetriesStatus(makeFailed(trs[1])))},
 		},
 		want: false,
 	}, {
@@ -4697,7 +4707,7 @@ func TestIsRunning(t *testing.T) {
 		name: "one matrixed taskrun cancelled: no retries remaining, one matrixed taskrun running",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetries(makeFailed(trs[0]))), makeStarted(trs[1])},
+			TaskRuns:     []*v1beta1.TaskRun{withCancelled(withRetriesStatus(makeFailed(trs[0]))), makeStarted(trs[1])},
 		},
 		want: true,
 	}, {

@@ -167,7 +167,7 @@ func (t ResolvedPipelineTask) isFailure() bool {
 		atLeastOneFailed := false
 		for _, run := range t.Runs {
 			isDone = isDone && run.IsDone()
-			runFailed := run.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.hasRemainingRetries()
+			runFailed := run.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.isRetryable()
 			atLeastOneFailed = atLeastOneFailed || runFailed
 		}
 		return atLeastOneFailed && isDone
@@ -185,7 +185,7 @@ func (t ResolvedPipelineTask) isFailure() bool {
 		atLeastOneFailed := false
 		for _, taskRun := range t.TaskRuns {
 			isDone = isDone && taskRun.IsDone()
-			taskRunFailed := taskRun.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.hasRemainingRetries()
+			taskRunFailed := taskRun.Status.GetCondition(apis.ConditionSucceeded).IsFalse() && !t.isRetryable()
 			atLeastOneFailed = atLeastOneFailed || taskRunFailed
 		}
 		return atLeastOneFailed && isDone
@@ -196,12 +196,12 @@ func (t ResolvedPipelineTask) isFailure() bool {
 		c = t.TaskRun.Status.GetCondition(apis.ConditionSucceeded)
 		isDone = t.TaskRun.IsDone()
 	}
-	return isDone && c.IsFalse() && !t.hasRemainingRetries()
+	return isDone && c.IsFalse() && !t.isRetryable()
 }
 
-// hasRemainingRetries returns true only when the number of retries already attempted
+// isRetryable returns true only when the number of retries already attempted
 // is less than the number of retries allowed.
-func (t ResolvedPipelineTask) hasRemainingRetries() bool {
+func (t ResolvedPipelineTask) isRetryable() bool {
 	var retriesDone int
 	switch {
 	case t.IsCustomTask() && t.IsMatrixed():
@@ -227,7 +227,7 @@ func (t ResolvedPipelineTask) hasRemainingRetries() bool {
 		}
 		// has remaining retries when any TaskRun has a remaining retry
 		for _, taskRun := range t.TaskRuns {
-			retriesDone = len(taskRun.Status.RetriesStatus)
+			retriesDone = taskRun.GetCompletedRetries()
 			if retriesDone < t.PipelineTask.Retries {
 				return true
 			}
@@ -237,7 +237,7 @@ func (t ResolvedPipelineTask) hasRemainingRetries() bool {
 		if t.TaskRun == nil {
 			return true
 		}
-		retriesDone = len(t.TaskRun.Status.RetriesStatus)
+		retriesDone = t.TaskRun.GetCompletedRetries()
 	}
 	return retriesDone < t.PipelineTask.Retries
 }

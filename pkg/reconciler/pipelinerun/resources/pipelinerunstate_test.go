@@ -96,7 +96,7 @@ func TestPipelineRunFacts_CheckDAGTasksDoneDone(t *testing.T) {
 	var taskExpectedState = PipelineRunState{{
 		PipelineTask: &pts[4], // 2 retries needed
 		TaskRunName:  "pipelinerun-mytask1",
-		TaskRun:      withRetries(makeFailed(trs[0])),
+		TaskRun:      withRetriesStatus(makeFailed(trs[0])),
 		ResolvedTaskResources: &resources.ResolvedTaskResources{
 			TaskSpec: &task.Spec,
 		},
@@ -623,7 +623,7 @@ func TestGetNextTaskWithRetries(t *testing.T) {
 	var taskExpectedState = PipelineRunState{{
 		PipelineTask: &pts[4], // 2 retries needed
 		TaskRunName:  "pipelinerun-mytask1",
-		TaskRun:      withRetries(makeFailed(trs[0])),
+		TaskRun:      withRetriesStatus(makeFailed(trs[0])),
 		ResolvedTaskResources: &resources.ResolvedTaskResources{
 			TaskSpec: &task.Spec,
 		},
@@ -737,7 +737,7 @@ func TestGetNextTaskWithRetries(t *testing.T) {
 	var taskExpectedStateMatrix = PipelineRunState{{
 		PipelineTask: &pts[20], // 2 retries needed
 		TaskRunNames: []string{"pipelinerun-mytask1"},
-		TaskRuns:     []*v1beta1.TaskRun{withRetries(makeFailed(trs[0]))},
+		TaskRuns:     []*v1beta1.TaskRun{withRetriesStatus(makeFailed(trs[0]))},
 		ResolvedTaskResources: &resources.ResolvedTaskResources{
 			TaskSpec: &task.Spec,
 		},

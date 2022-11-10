@@ -3395,6 +3395,9 @@ status:
   conditions:
   - status: "False"
     type: Succeeded
+  - status: "False"
+    type: TaskRunRetryable
+    message: "1"
   podName: my-pod-name
   retriesStatus:
   - conditions:

@@ -352,7 +352,7 @@ func (state PipelineRunState) getRetryableTasks(candidateTasks sets.String) []*R
 					}
 				}
 			}
-			if status.IsFalse() && !t.isCancelled() && t.hasRemainingRetries() {
+			if status.IsFalse() && !t.isCancelled() && t.isRetryable() {
 				tasks = append(tasks, t)
 			}
 		}

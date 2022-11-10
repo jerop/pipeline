@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
@@ -146,6 +147,8 @@ type TaskRunConditionType string
 const (
 	// TaskRunConditionResultsVerified is a Condition Type that indicates that the results were verified by spire
 	TaskRunConditionResultsVerified TaskRunConditionType = "SignedResultsVerified"
+
+	TaskRunConditionRetryable TaskRunConditionType = "TaskRunRetryable"
 )
 
 func (t TaskRunConditionType) String() string {
@@ -181,6 +184,8 @@ const (
 	TaskRunReasonsResultsVerificationFailed TaskRunReason = "TaskRunResultsVerificationFailed"
 	// AwaitingTaskRunResults is the reason set when waiting upon `TaskRun` results and signatures to verify
 	AwaitingTaskRunResults TaskRunReason = "AwaitingTaskRunResults"
+
+	TaskRunReasonRetryable TaskRunReason = "TaskRunRetryable"
 )
 
 func (t TaskRunReason) String() string {
@@ -222,6 +227,24 @@ func (trs *TaskRunStatus) MarkResourceFailed(reason TaskRunReason, err error) {
 	})
 	succeeded := trs.GetCondition(apis.ConditionSucceeded)
 	trs.CompletionTime = &succeeded.LastTransitionTime.Inner
+}
+
+func (trs *TaskRunStatus) MarkResourceRetryable(retries int) {
+	taskRunCondSet.Manage(trs).SetCondition(apis.Condition{
+		Type:    apis.ConditionType(TaskRunConditionRetryable),
+		Status:  corev1.ConditionTrue,
+		Reason:  string(TaskRunReasonRetryable),
+		Message: strconv.Itoa(retries),
+	})
+}
+
+func (trs *TaskRunStatus) MarkResourceUnRetryable(retries int) {
+	taskRunCondSet.Manage(trs).SetCondition(apis.Condition{
+		Type:    apis.ConditionType(TaskRunConditionRetryable),
+		Status:  corev1.ConditionFalse,
+		Reason:  string(TaskRunReasonRetryable),
+		Message: strconv.Itoa(retries),
+	})
 }
 
 // TaskRunStatusFields holds the fields of TaskRun's status.  This is defined
@@ -469,6 +492,19 @@ func (tr *TaskRun) IsTaskRunResultVerified() bool {
 // IsTaskRunResultDone returns true if the TaskRun's results are available for verification
 func (tr *TaskRun) IsTaskRunResultDone() bool {
 	return !tr.Status.GetCondition(apis.ConditionType(TaskRunConditionResultsVerified.String())).IsUnknown()
+}
+
+func (tr *TaskRun) IsTaskRunRetryable() bool {
+	return tr.Status.GetCondition(apis.ConditionType(TaskRunConditionRetryable)).IsTrue()
+}
+
+func (tr *TaskRun) IsTaskRunUnRetryable() bool {
+	return tr.Status.GetCondition(apis.ConditionType(TaskRunConditionRetryable)).IsFalse()
+}
+
+func (tr *TaskRun) GetCompletedRetries() int {
+	completedRetries, _ := strconv.Atoi(tr.Status.GetCondition(apis.ConditionType(TaskRunConditionRetryable)).GetMessage())
+	return completedRetries
 }
 
 // HasTimedOut returns true if the TaskRun runtime is beyond the allowed timeout
