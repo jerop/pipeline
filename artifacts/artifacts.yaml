@@ -1,0 +1,223 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  workspaces:
+    - name: output
+  params:
+    - name: url
+    - name: commit
+  artifacts:
+    outputs:
+      - name: source
+        properties:
+          uri:
+            type: string
+          digest:
+            type: string
+  steps:
+    - name: clone
+      image: ...
+      script: |
+        #!/usr/bin/env sh
+        ...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: golang-test
+spec:
+  params:
+    - name: package
+  workspaces:
+    - name: source
+  steps:
+    - name: unit-test
+      image: ...
+      workingDir: $(workspaces.source.path)
+      script: ...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: gcs-upload
+spec:
+  workspaces:
+    - name: credentials
+    - name: source
+  params:
+    - name: path
+    - name: location
+  steps:
+    - name: upload
+      image: ...
+      script: ...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko
+spec:
+  params:
+    - name: image-name
+  workspaces: ## do we need this?
+    - name: source
+  artifacts:
+    inputs:
+      - name: source
+        properties:
+          uri:
+            type: string
+          digest:
+            type: string
+    outputs:
+      - name: image
+        properties:
+          uri:
+            type: string
+          digest:
+            type: string
+  steps:
+    - name: build-and-push
+      workingDir: $(workspaces.source.path)
+      image: ...
+      args: ...
+    - name: write-url
+      image: ...
+      script: ...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scan-image
+spec:
+  workspaces:
+    - name: manifest-dir
+  params:
+    - name: image-path
+  steps:
+    - name: trivy-scan
+      image: ...
+      workingDir: $(workspaces.manifest-dir.path)
+      script: ...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci-pipeline
+spec:
+  artifacts:
+    inputs:
+      - name: source
+        task: source
+    outputs:
+      - name: image
+        type: image
+  params:
+    - name: repo-url
+    - name: repo-revision
+    - name: package
+    - name: image-name
+    - name: gcs-path
+  workspaces:
+    - name: shared-data
+    - name: gcs-credentials
+  results:
+    - name: source-ARTIFACT-INPUTS
+      type: object
+      value: $(tasks.clone.results.source-ARTIFACT-OUTPUTS)
+    - name: image-ARTIFACT-OUTPUTS
+      type: object
+      value: $(tasks.build-and-push-image.results.image-ARTIFACT-OUTPUTS)
+  tasks:
+#    - name: clone
+#      workspaces:
+#        - name: output
+#          workspace: shared-data
+#      params:
+#        - name: url
+#          value: $(params.repo-url)
+#        - name: revision
+#          value: $(params.repo-revision)
+#      taskRef:
+#        name: git-clone
+    - name: test
+      runAfter:
+        - clone
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: package
+          value: $(params.package)
+      taskRef:
+        name: golang-test
+    - name: upload-test-output
+      runAfter:
+        - test
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: credentials
+          workspace: gcs-credentials
+      params:
+        - name: path
+          value: ??? # where does golang-test write test outputs?
+        - name: location
+          value: $(params.gcs-path)
+      taskRef:
+        name: gcs-upload
+    - name: build-and-push-image
+      runAfter:
+        - gcs-upload
+      params:
+        - name: image-name
+          value: $(params.image-name)
+      workspaces:
+        - name: source
+          workspace: shared-data
+      taskRef:
+        name: kaniko
+    - name: scan-image
+      runAfter:
+        - build-and-push-image
+      workspaces:
+        - name: manifest-dir
+          workspace: shared-data
+      params:
+        - name: image-path
+          value: $(tasks.build-and-push-image.results.image-url)
+      taskRef:
+        name: scan-image
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: ci-pipelinerun-
+spec:
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: gcs-credentials
+      secret:
+        secretName: gcs-credentials
+  params:
+    - name: repo-url
+      value: https://github.com/foo/bar.git
+    - name: repo-revision
+      value: main
+    - name: package
+      value: https://github.com/foo/bar.git
+    - name: image-name
+      value: container.registry.com/location/my_app:version
+    - name: gcs-path
+      value: gs://bucket/tests/
+  pipelineRef:
+    name: ci-pipeline
