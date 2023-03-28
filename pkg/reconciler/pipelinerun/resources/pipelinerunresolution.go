@@ -29,6 +29,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/remote"
 	"github.com/tektoncd/pipeline/pkg/trustedresources"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/kmeta"
 )
@@ -37,6 +38,8 @@ const (
 	// ReasonConditionCheckFailed indicates that the reason for the failure status is that the
 	// condition check associated to the pipeline task evaluated to false
 	ReasonConditionCheckFailed = "ConditionCheckFailed"
+
+	CloudBuild = "cloudbuild/v2"
 )
 
 // TaskSkipStatus stores whether a task was skipped and why
@@ -576,10 +579,10 @@ func ValidateTaskRunSpecs(p *v1beta1.PipelineSpec, pr *v1beta1.PipelineRun) erro
 
 func isCustomTask(ctx context.Context, rpt ResolvedPipelineTask) bool {
 	invalidSpec := rpt.PipelineTask.TaskRef != nil && rpt.PipelineTask.TaskSpec != nil
-	isTaskRefCustomTask := rpt.PipelineTask.TaskRef != nil && rpt.PipelineTask.TaskRef.APIVersion != "" &&
-		rpt.PipelineTask.TaskRef.Kind != ""
-	isTaskSpecCustomTask := rpt.PipelineTask.TaskSpec != nil && rpt.PipelineTask.TaskSpec.APIVersion != "" &&
-		rpt.PipelineTask.TaskSpec.Kind != ""
+	isTaskRefCustomTask := rpt.PipelineTask.TaskRef != nil && ((rpt.PipelineTask.TaskRef.APIVersion != "" &&
+		rpt.PipelineTask.TaskRef.Kind != "") || rpt.PipelineTask.TaskRef.CustomTask != "")
+	isTaskSpecCustomTask := rpt.PipelineTask.TaskSpec != nil && ((rpt.PipelineTask.TaskSpec.APIVersion != "" &&
+		rpt.PipelineTask.TaskSpec.Kind != "") || rpt.PipelineTask.TaskRef.CustomTask != "")
 	return !invalidSpec && (isTaskRefCustomTask || isTaskSpecCustomTask)
 }
 
@@ -683,6 +686,19 @@ func (t *ResolvedPipelineTask) resolveTaskResources(
 	t.ResolvedTask = rtr
 
 	return nil
+}
+
+func (t *ResolvedPipelineTask) CreateTypeMeta() runtime.TypeMeta {
+	apiVersion := t.PipelineTask.TaskSpec.APIVersion
+	kind := t.PipelineTask.TaskSpec.Kind
+	if t.PipelineTask.TaskRef.CustomTask != "" {
+		apiVersion = CloudBuild
+		kind = t.PipelineTask.TaskRef.CustomTask
+	}
+	return runtime.TypeMeta{
+		APIVersion: apiVersion,
+		Kind:       kind,
+	}
 }
 
 func resolveTask(

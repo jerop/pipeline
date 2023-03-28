@@ -39,7 +39,7 @@ func (ps *PipelineSpec) SetDefaults(ctx context.Context) {
 
 	for _, pt := range ps.Tasks {
 		if pt.TaskRef != nil {
-			if pt.TaskRef.Kind == "" {
+			if pt.TaskRef.Kind == "" && pt.TaskRef.CustomTask == "" {
 				pt.TaskRef.Kind = NamespacedTaskKind
 			}
 			if pt.TaskRef.Name == "" && pt.TaskRef.Resolver == "" {

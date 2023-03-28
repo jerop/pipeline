@@ -943,10 +943,7 @@ func (c *Reconciler) createRunObject(ctx context.Context, runName string, params
 				return nil, err
 			}
 			r.Spec.Spec = &v1alpha1.EmbeddedRunSpec{
-				TypeMeta: runtime.TypeMeta{
-					APIVersion: rpt.PipelineTask.TaskSpec.APIVersion,
-					Kind:       rpt.PipelineTask.TaskSpec.Kind,
-				},
+				TypeMeta: rpt.CreateTypeMeta(),
 				Metadata: rpt.PipelineTask.TaskSpec.Metadata,
 				Spec: runtime.RawExtension{
 					Raw: j,
@@ -980,10 +977,7 @@ func (c *Reconciler) createRunObject(ctx context.Context, runName string, params
 			return nil, err
 		}
 		r.Spec.CustomSpec = &v1beta1.EmbeddedCustomRunSpec{
-			TypeMeta: runtime.TypeMeta{
-				APIVersion: rpt.PipelineTask.TaskSpec.APIVersion,
-				Kind:       rpt.PipelineTask.TaskSpec.Kind,
-			},
+			TypeMeta: rpt.CreateTypeMeta(),
 			Metadata: rpt.PipelineTask.TaskSpec.Metadata,
 			Spec: runtime.RawExtension{
 				Raw: j,

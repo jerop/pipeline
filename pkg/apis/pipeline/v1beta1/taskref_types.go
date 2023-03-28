@@ -36,6 +36,8 @@ type TaskRef struct {
 	// feature gate is enabled.
 	// +optional
 	ResolverRef `json:",omitempty"`
+
+	CustomTask string `json:"customTask,omitempty"`
 }
 
 // Check that Pipeline may be validated and defaulted.

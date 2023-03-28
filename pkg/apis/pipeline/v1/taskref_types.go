@@ -31,6 +31,8 @@ type TaskRef struct {
 	// feature gate is enabled.
 	// +optional
 	ResolverRef `json:",omitempty"`
+
+	CustomTask string `json:"customTask,omitempty"`
 }
 
 // TaskKind defines the type of Task used by the pipeline.
