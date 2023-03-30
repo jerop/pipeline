@@ -17,7 +17,6 @@ limitations under the License.
 package taskrun
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +28,6 @@ import (
 )
 
 func TestValidateResolvedTask_ValidParams(t *testing.T) {
-	ctx := context.Background()
 	task := &v1beta1.Task{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: v1beta1.TaskSpec{
@@ -118,12 +116,11 @@ func TestValidateResolvedTask_ValidParams(t *testing.T) {
 			}},
 		}},
 	}
-	if err := ValidateResolvedTask(ctx, p, m, rtr); err != nil {
+	if err := ValidateResolvedTask(p, m.GetAllParams(), rtr); err != nil {
 		t.Errorf("Did not expect to see error when validating TaskRun with correct params but saw %v", err)
 	}
 }
 func TestValidateResolvedTask_ExtraValidParams(t *testing.T) {
-	ctx := context.Background()
 	tcs := []struct {
 		name   string
 		task   v1beta1.Task
@@ -216,7 +213,7 @@ func TestValidateResolvedTask_ExtraValidParams(t *testing.T) {
 			TaskSpec: &tc.task.Spec,
 		}
 		t.Run(tc.name, func(t *testing.T) {
-			if err := ValidateResolvedTask(ctx, tc.params, tc.matrix, rtr); err != nil {
+			if err := ValidateResolvedTask(tc.params, tc.matrix.GetAllParams(), rtr); err != nil {
 				t.Errorf("Did not expect to see error when validating TaskRun with correct params but saw %v", err)
 			}
 		})
@@ -224,7 +221,6 @@ func TestValidateResolvedTask_ExtraValidParams(t *testing.T) {
 }
 
 func TestValidateResolvedTask_InvalidParams(t *testing.T) {
-	ctx := context.Background()
 	tcs := []struct {
 		name    string
 		task    v1beta1.Task
@@ -426,7 +422,7 @@ func TestValidateResolvedTask_InvalidParams(t *testing.T) {
 			TaskSpec: &tc.task.Spec,
 		}
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateResolvedTask(ctx, tc.params, tc.matrix, rtr)
+			err := ValidateResolvedTask(tc.params, tc.matrix.GetAllParams(), rtr)
 			if d := cmp.Diff(tc.wantErr, err.Error()); d != "" {
 				t.Errorf("Did not get the expected Error  %s", diff.PrintWantGot(d))
 			}

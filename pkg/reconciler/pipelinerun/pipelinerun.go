@@ -564,7 +564,7 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 
 	for _, rpt := range pipelineRunFacts.State {
 		if !rpt.IsCustomTask() {
-			err := taskrun.ValidateResolvedTask(ctx, rpt.PipelineTask.Params, rpt.PipelineTask.Matrix, rpt.ResolvedTask)
+			err := taskrun.ValidateResolvedTask(rpt.PipelineTask.Params, rpt.PipelineTask.Matrix.GetAllParams(), rpt.ResolvedTask)
 			if err != nil {
 				logger.Errorf("Failed to validate pipelinerun %q with error %v", pr.Name, err)
 				pr.Status.MarkFailed(ReasonFailedValidation, err.Error())

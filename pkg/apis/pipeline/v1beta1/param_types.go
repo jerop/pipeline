@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/tektoncd/pipeline/pkg/list"
 	"github.com/tektoncd/pipeline/pkg/substitution"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -584,4 +585,131 @@ func validateObjectVariable(value, prefix string, objectParamNameKeys map[string
 	}
 
 	return errs.Also(substitution.ValidateEntireVariableProhibitedP(value, prefix, objectNames))
+}
+
+// ValidateParams validates that all Pipeline Task, Matrix.Params and Matrix.Include parameters all have values, match the specified
+// type and object params have all the keys required
+func (ps ParamSpecs) ValidateParams(params Params, matrixParams Params) error {
+	neededParamsNames, neededParamsTypes := ps.neededParamsNamesAndTypes()
+	providedParams := params
+	providedParams = append(providedParams, matrixParams...)
+	providedParamsNames := providedParams.ExtractNames()
+	if missingParamsNames := ps.missingParamsNames(neededParamsNames, providedParamsNames); len(missingParamsNames) != 0 {
+		return fmt.Errorf("missing values for these params which have no default values: %s", missingParamsNames)
+	}
+	if wrongTypeParamNames := wrongTypeParamsNames(params, matrixParams, neededParamsTypes); len(wrongTypeParamNames) != 0 {
+		return fmt.Errorf("param types don't match the user-specified type: %s", wrongTypeParamNames)
+	}
+	if missingKeysObjectParamNames := ps.MissingKeysObjectParamNames(params); len(missingKeysObjectParamNames) != 0 {
+		return fmt.Errorf("missing keys for these params which are required in ParamSpec's properties %v", missingKeysObjectParamNames)
+	}
+	return nil
+}
+
+// MissingKeysObjectParamNames checks if all required keys of object type param definitions are provided in params or param definitions' defaults.
+func (ps ParamSpecs) MissingKeysObjectParamNames(params Params) map[string][]string {
+	neededKeys := make(map[string][]string)
+	providedKeys := make(map[string][]string)
+
+	for _, spec := range ps {
+		if spec.Type == ParamTypeObject {
+			// collect required keys from properties section
+			for key := range spec.Properties {
+				neededKeys[spec.Name] = append(neededKeys[spec.Name], key)
+			}
+
+			// collect provided keys from default
+			if spec.Default != nil && spec.Default.ObjectVal != nil {
+				for key := range spec.Default.ObjectVal {
+					providedKeys[spec.Name] = append(providedKeys[spec.Name], key)
+				}
+			}
+		}
+	}
+
+	// collect provided keys from run level value
+	for _, p := range params {
+		if p.Value.Type == ParamTypeObject {
+			for key := range p.Value.ObjectVal {
+				providedKeys[p.Name] = append(providedKeys[p.Name], key)
+			}
+		}
+	}
+
+	return findMissingKeys(neededKeys, providedKeys)
+}
+
+// neededParamsNamesAndTypes returns the needed parameter names and types based on the paramSpec
+func (ps ParamSpecs) neededParamsNamesAndTypes() (sets.String, map[string]ParamType) {
+	neededParamsNames := sets.String{}
+	neededParamsTypes := make(map[string]ParamType)
+	for _, inputResourceParam := range ps {
+		neededParamsNames.Insert(inputResourceParam.Name)
+		neededParamsTypes[inputResourceParam.Name] = inputResourceParam.Type
+	}
+	return neededParamsNames, neededParamsTypes
+}
+
+// missingParamsNames returns a slice of missing parameter names that have not been declared with a default value
+// in the paramSpec
+func (ps ParamSpecs) missingParamsNames(neededParams sets.String, providedParams sets.String) []string {
+	missingParamsNames := neededParams.Difference(providedParams)
+	var missingParamsNamesWithNoDefaults []string
+	for _, inputResourceParam := range ps {
+		if missingParamsNames.Has(inputResourceParam.Name) && inputResourceParam.Default == nil {
+			missingParamsNamesWithNoDefaults = append(missingParamsNamesWithNoDefaults, inputResourceParam.Name)
+		}
+	}
+	return missingParamsNamesWithNoDefaults
+}
+
+func wrongTypeParamsNames(params Params, matrixParams Params, neededParamsTypes map[string]ParamType) []string {
+	// TODO(#4723): validate that $(task.taskname.result.resultname) is invalid for array and object type.
+	// It should be used to refer string and need to add [*] to refer to array or object.
+	var wrongTypeParamNames []string
+	for _, param := range params {
+		if _, ok := neededParamsTypes[param.Name]; !ok {
+			// Ignore any missing params - this happens when extra params were
+			// passed to the task that aren't being used.
+			continue
+		}
+		// This is needed to support array replacements in params. Users want to use $(tasks.taskName.results.resultname[*])
+		// to pass array result to array param, yet in yaml format this will be
+		// unmarshalled to string for ParamValues. So we need to check and skip this validation.
+		// Please refer issue #4879 for more details and examples.
+		if param.Value.Type == ParamTypeString && (neededParamsTypes[param.Name] == ParamTypeArray || neededParamsTypes[param.Name] == ParamTypeObject) && VariableSubstitutionRegex.MatchString(param.Value.StringVal) {
+			continue
+		}
+		if param.Value.Type != neededParamsTypes[param.Name] {
+			wrongTypeParamNames = append(wrongTypeParamNames, param.Name)
+		}
+	}
+	for _, param := range matrixParams {
+		if _, ok := neededParamsTypes[param.Name]; !ok {
+			// Ignore any missing params - this happens when extra params were
+			// passed to the task that aren't being used.
+			continue
+		}
+		if neededParamsTypes[param.Name] != ParamTypeString {
+			wrongTypeParamNames = append(wrongTypeParamNames, param.Name)
+		}
+	}
+	return wrongTypeParamNames
+}
+
+// findMissingKeys checks if objects have missing keys in its providers (taskrun value and default)
+func findMissingKeys(neededKeys, providedKeys map[string][]string) map[string][]string {
+	missings := map[string][]string{}
+	for p, keys := range providedKeys {
+		if _, ok := neededKeys[p]; !ok {
+			// Ignore any missing objects - this happens when object param is provided with default
+			continue
+		}
+		missedKeys := list.DiffLeft(neededKeys[p], keys)
+		if len(missedKeys) != 0 {
+			missings[p] = missedKeys
+		}
+	}
+
+	return missings
 }

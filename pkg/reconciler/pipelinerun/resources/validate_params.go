@@ -21,7 +21,6 @@ import (
 
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/list"
-	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun"
 )
 
 // ValidateParamTypesMatching validate that parameters in PipelineRun override corresponding parameters in Pipeline of the same type.
@@ -76,8 +75,8 @@ func ValidateRequiredParametersProvided(pipelineParameters *v1beta1.ParamSpecs, 
 }
 
 // ValidateObjectParamRequiredKeys validates that the required keys of all the object parameters expected by the Pipeline are provided by the PipelineRun.
-func ValidateObjectParamRequiredKeys(pipelineParameters []v1beta1.ParamSpec, pipelineRunParameters v1beta1.Params) error {
-	missings := taskrun.MissingKeysObjectParamNames(pipelineParameters, pipelineRunParameters)
+func ValidateObjectParamRequiredKeys(pipelineParameters v1beta1.ParamSpecs, pipelineRunParameters v1beta1.Params) error {
+	missings := pipelineParameters.MissingKeysObjectParamNames(pipelineRunParameters)
 	if len(missings) != 0 {
 		return fmt.Errorf("PipelineRun missing object keys for parameters: %v", missings)
 	}
