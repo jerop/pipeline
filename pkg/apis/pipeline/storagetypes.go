@@ -15,11 +15,3 @@ limitations under the License.
 */
 
 package pipeline
-
-const (
-	// ArtifactStorageBucketType holds the name of the PipelineResource type for a bucket
-	ArtifactStorageBucketType = "bucket"
-
-	// ArtifactStoragePVCType holds the name of the PipelineResource type for a pvc
-	ArtifactStoragePVCType = "pvc"
-)

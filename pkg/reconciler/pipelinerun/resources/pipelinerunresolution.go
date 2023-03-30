@@ -33,12 +33,6 @@ import (
 	"knative.dev/pkg/kmeta"
 )
 
-const (
-	// ReasonConditionCheckFailed indicates that the reason for the failure status is that the
-	// condition check associated to the pipeline task evaluated to false
-	ReasonConditionCheckFailed = "ConditionCheckFailed"
-)
-
 // TaskSkipStatus stores whether a task was skipped and why
 type TaskSkipStatus struct {
 	IsSkipped      bool

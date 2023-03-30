@@ -99,8 +99,6 @@ const (
 	// TaskRunCancelledByPipelineMsg indicates that the PipelineRun of which this
 	// TaskRun was a part of has been cancelled.
 	TaskRunCancelledByPipelineMsg TaskRunSpecStatusMessage = "TaskRun cancelled as the PipelineRun it belongs to has been cancelled."
-	// TaskRunCancelledByPipelineTimeoutMsg indicates that the TaskRun was cancelled because the PipelineRun running it timed out.
-	TaskRunCancelledByPipelineTimeoutMsg TaskRunSpecStatusMessage = "TaskRun cancelled as the PipelineRun it belongs to has timed out."
 )
 
 // TaskRunDebug defines the breakpoint config for a particular TaskRun
@@ -137,25 +135,9 @@ const (
 	TaskRunReasonStarted TaskRunReason = "Started"
 	// TaskRunReasonRunning is the reason set when the TaskRun is running
 	TaskRunReasonRunning TaskRunReason = "Running"
-	// TaskRunReasonSuccessful is the reason set when the TaskRun completed successfully
-	TaskRunReasonSuccessful TaskRunReason = "Succeeded"
-	// TaskRunReasonFailed is the reason set when the TaskRun completed with a failure
-	TaskRunReasonFailed TaskRunReason = "Failed"
-	// TaskRunReasonToBeRetried is the reason set when the last TaskRun execution failed, and will be retried
-	TaskRunReasonToBeRetried TaskRunReason = "ToBeRetried"
-	// TaskRunReasonCancelled is the reason set when the TaskRun is cancelled by the user
-	TaskRunReasonCancelled TaskRunReason = "TaskRunCancelled"
+
 	// TaskRunReasonTimedOut is the reason set when one TaskRun execution has timed out
 	TaskRunReasonTimedOut TaskRunReason = "TaskRunTimeout"
-	// TaskRunReasonResolvingTaskRef indicates that the TaskRun is waiting for
-	// its taskRef to be asynchronously resolved.
-	TaskRunReasonResolvingTaskRef = "ResolvingTaskRef"
-	// TaskRunReasonImagePullFailed is the reason set when the step of a task fails due to image not being pulled
-	TaskRunReasonImagePullFailed TaskRunReason = "TaskRunImagePullFailed"
-	// TaskRunReasonResultLargerThanAllowedLimit is the reason set when one of the results exceeds its maximum allowed limit of 1 KB
-	TaskRunReasonResultLargerThanAllowedLimit TaskRunReason = "TaskRunResultLargerThanAllowedLimit"
-	// TaskRunReasonStopSidecarFailed indicates that the sidecar is not properly stopped.
-	TaskRunReasonStopSidecarFailed = "TaskRunStopSidecarFailed"
 )
 
 func (t TaskRunReason) String() string {

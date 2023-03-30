@@ -16,13 +16,3 @@ limitations under the License.
 
 package v1beta1
 
-import (
-	"knative.dev/pkg/apis"
-)
-
-const (
-	// ConditionTypeConvertible is a Warning condition that is set on
-	// resources when they cannot be converted to warn of a forthcoming
-	// breakage.
-	ConditionTypeConvertible apis.ConditionType = "Convertible"
-)

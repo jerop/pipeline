@@ -117,21 +117,14 @@ func (rs CustomRunSpec) GetParam(name string) *Param {
 type CustomRunReason string
 
 const (
-	// CustomRunReasonStarted is the reason set when the CustomRun has just started.
-	CustomRunReasonStarted CustomRunReason = "Started"
+
 	// CustomRunReasonRunning is the reason set when the CustomRun is running.
 	CustomRunReasonRunning CustomRunReason = "Running"
 	// CustomRunReasonSuccessful is the reason set when the CustomRun completed successfully.
 	CustomRunReasonSuccessful CustomRunReason = "Succeeded"
-	// CustomRunReasonFailed is the reason set when the CustomRun completed with a failure.
-	CustomRunReasonFailed CustomRunReason = "Failed"
+
 	// CustomRunReasonCancelled must be used in the Condition Reason to indicate that a CustomRun was cancelled.
 	CustomRunReasonCancelled CustomRunReason = "CustomRunCancelled"
-	// CustomRunReasonTimedOut must be used in the Condition Reason to indicate that a CustomRun was timed out.
-	CustomRunReasonTimedOut CustomRunReason = "CustomRunTimedOut"
-	// CustomRunReasonWorkspaceNotSupported can be used in the Condition Reason to indicate that the
-	// CustomRun contains a workspace which is not supported by this custom task.
-	CustomRunReasonWorkspaceNotSupported CustomRunReason = "CustomRunWorkspaceNotSupported"
 )
 
 func (t CustomRunReason) String() string {

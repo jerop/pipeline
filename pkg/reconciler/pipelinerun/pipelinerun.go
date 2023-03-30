@@ -75,9 +75,7 @@ const (
 	// ReasonCouldntGetPipeline indicates that the reason for the failure status is that the
 	// associated Pipeline couldn't be retrieved
 	ReasonCouldntGetPipeline = "CouldntGetPipeline"
-	// ReasonInvalidBindings indicates that the reason for the failure status is that the
-	// PipelineResources bound in the PipelineRun didn't match those declared in the Pipeline
-	ReasonInvalidBindings = "InvalidPipelineResourceBindings"
+
 	// ReasonInvalidWorkspaceBinding indicates that a Pipeline expects a workspace but a
 	// PipelineRun has provided an invalid binding.
 	ReasonInvalidWorkspaceBinding = "InvalidWorkspaceBindings"

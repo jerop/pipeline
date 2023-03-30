@@ -50,10 +50,6 @@ const (
 	KeySignatureSuffix = ".sig"
 	// KeyResultManifest key used to get the result manifest from the results
 	KeyResultManifest = "RESULT_MANIFEST"
-	// WorkloadAPI is the name of the SPIFFE/SPIRE CSI Driver volume
-	WorkloadAPI = "spiffe-workload-api"
-	// VolumeMountPath is the volume mount in the pods to access the SPIFFE/SPIRE agent workload API
-	VolumeMountPath = "/spiffe-workload-api"
 )
 
 // ControllerAPIClient interface maps to the spire controller API to interact with spire

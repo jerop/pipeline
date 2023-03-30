@@ -296,31 +296,6 @@ type PipelineRunReason string
 const (
 	// PipelineRunReasonStarted is the reason set when the PipelineRun has just started
 	PipelineRunReasonStarted PipelineRunReason = "Started"
-	// PipelineRunReasonRunning is the reason set when the PipelineRun is running
-	PipelineRunReasonRunning PipelineRunReason = "Running"
-	// PipelineRunReasonSuccessful is the reason set when the PipelineRun completed successfully
-	PipelineRunReasonSuccessful PipelineRunReason = "Succeeded"
-	// PipelineRunReasonCompleted is the reason set when the PipelineRun completed successfully with one or more skipped Tasks
-	PipelineRunReasonCompleted PipelineRunReason = "Completed"
-	// PipelineRunReasonFailed is the reason set when the PipelineRun completed with a failure
-	PipelineRunReasonFailed PipelineRunReason = "Failed"
-	// PipelineRunReasonCancelled is the reason set when the PipelineRun cancelled by the user
-	// This reason may be found with a corev1.ConditionFalse status, if the cancellation was processed successfully
-	// This reason may be found with a corev1.ConditionUnknown status, if the cancellation is being processed or failed
-	PipelineRunReasonCancelled PipelineRunReason = "Cancelled"
-	// PipelineRunReasonPending is the reason set when the PipelineRun is in the pending state
-	PipelineRunReasonPending PipelineRunReason = "PipelineRunPending"
-	// PipelineRunReasonTimedOut is the reason set when the PipelineRun has timed out
-	PipelineRunReasonTimedOut PipelineRunReason = "PipelineRunTimeout"
-	// PipelineRunReasonStopping indicates that no new Tasks will be scheduled by the controller, and the
-	// pipeline will stop once all running tasks complete their work
-	PipelineRunReasonStopping PipelineRunReason = "PipelineRunStopping"
-	// PipelineRunReasonCancelledRunningFinally indicates that pipeline has been gracefully cancelled
-	// and no new Tasks will be scheduled by the controller, but final tasks are now running
-	PipelineRunReasonCancelledRunningFinally PipelineRunReason = "CancelledRunningFinally"
-	// PipelineRunReasonStoppedRunningFinally indicates that pipeline has been gracefully stopped
-	// and no new Tasks will be scheduled by the controller, but final tasks are now running
-	PipelineRunReasonStoppedRunningFinally PipelineRunReason = "StoppedRunningFinally"
 )
 
 func (t PipelineRunReason) String() string {
@@ -449,29 +424,6 @@ type SkippedTask struct {
 
 // SkippingReason explains why a PipelineTask was skipped.
 type SkippingReason string
-
-const (
-	// WhenExpressionsSkip means the task was skipped due to at least one of its when expressions evaluating to false
-	WhenExpressionsSkip SkippingReason = "When Expressions evaluated to false"
-	// ParentTasksSkip means the task was skipped because its parent was skipped
-	ParentTasksSkip SkippingReason = "Parent Tasks were skipped"
-	// StoppingSkip means the task was skipped because the pipeline run is stopping
-	StoppingSkip SkippingReason = "PipelineRun was stopping"
-	// GracefullyCancelledSkip means the task was skipped because the pipeline run has been gracefully cancelled
-	GracefullyCancelledSkip SkippingReason = "PipelineRun was gracefully cancelled"
-	// GracefullyStoppedSkip means the task was skipped because the pipeline run has been gracefully stopped
-	GracefullyStoppedSkip SkippingReason = "PipelineRun was gracefully stopped"
-	// MissingResultsSkip means the task was skipped because it's missing necessary results
-	MissingResultsSkip SkippingReason = "Results were missing"
-	// PipelineTimedOutSkip means the task was skipped because the PipelineRun has passed its overall timeout.
-	PipelineTimedOutSkip SkippingReason = "PipelineRun timeout has been reached"
-	// TasksTimedOutSkip means the task was skipped because the PipelineRun has passed its Timeouts.Tasks.
-	TasksTimedOutSkip SkippingReason = "PipelineRun Tasks timeout has been reached"
-	// FinallyTimedOutSkip means the task was skipped because the PipelineRun has passed its Timeouts.Finally.
-	FinallyTimedOutSkip SkippingReason = "PipelineRun Finally timeout has been reached"
-	// None means the task was not skipped
-	None SkippingReason = "None"
-)
 
 // PipelineRunResult used to describe the results of a pipeline
 type PipelineRunResult struct {

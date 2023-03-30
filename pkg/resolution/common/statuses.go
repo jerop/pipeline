@@ -25,11 +25,6 @@ const (
 )
 
 // happy reasons
-const (
-	// ReasonResolutionSuccessful is used to indicate that
-	// resolution of a resource has completed successfully.
-	ReasonResolutionSuccessful = "ResolutionSuccessful"
-)
 
 // unhappy reasons
 const (

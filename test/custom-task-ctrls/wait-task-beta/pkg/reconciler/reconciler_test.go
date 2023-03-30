@@ -32,11 +32,6 @@ import (
 	"knative.dev/pkg/apis"
 )
 
-const (
-	apiVersion string = "wait.testing.tekton.dev/v1beta1"
-	kind       string = "Wait"
-)
-
 var (
 	filterTypeMeta        = cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion")
 	filterObjectMeta      = cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "CreationTimestamp", "Generation", "ManagedFields")

@@ -121,24 +121,14 @@ func (rs RunSpec) GetParam(name string) *v1beta1.Param {
 type RunReason string
 
 const (
-	// RunReasonStarted is the reason set when the Run has just started.
-	RunReasonStarted RunReason = "Started"
+
 	// RunReasonRunning is the reason set when the Run is running.
 	RunReasonRunning RunReason = "Running"
 	// RunReasonSuccessful is the reason set when the Run completed successfully.
 	RunReasonSuccessful RunReason = "Succeeded"
-	// RunReasonFailed is the reason set when the Run completed with a failure.
-	RunReasonFailed RunReason = "Failed"
+
 	// RunReasonCancelled must be used in the Condition Reason to indicate that a Run was cancelled.
 	RunReasonCancelled RunReason = "RunCancelled"
-	// RunReasonTimedOut must be used in the Condition Reason to indicate that a Run was timed out.
-	RunReasonTimedOut RunReason = "RunTimedOut"
-	// RunReasonWorkspaceNotSupported can be used in the Condition Reason to indicate that the
-	// Run contains a workspace which is not supported by this custom task.
-	RunReasonWorkspaceNotSupported RunReason = "RunWorkspaceNotSupported"
-	// RunReasonPodTemplateNotSupported can be used in the Condition Reason to indicate that the
-	// Run contains a pod template which is not supported by this custom task.
-	RunReasonPodTemplateNotSupported RunReason = "RunPodTemplateNotSupported"
 )
 
 func (t RunReason) String() string {
